@@ -67,6 +67,10 @@ class StartPage(tk.Frame):
          command=lambda: controller.show_frame(PageTwo))
         button2.pack()
 
+        button3 = ttk.Button(self, text="I want to control my System",
+         command=lambda: controller.show_frame(PageThree))
+        button3.pack()
+
 
 class PageOne(tk.Frame):
 
@@ -75,11 +79,11 @@ class PageOne(tk.Frame):
         label = tk.Label(self, text = "control my valve", font=LARGE_FONT)
         label.pack(pady=10,padx=10)
         
-        button1 = tk.Button(self, text="Home",
+        button1 = ttk.Button(self, text="Home",
          command=lambda: controller.show_frame(StartPage))
         button1.pack()
         
-        button2 = tk.Button(self, text="close my valve :(",
+        button2 = ttk.Button(self, text="close my valve :(",
          command=lambda: write_servo("0"))
         button2.pack()
 
@@ -131,7 +135,7 @@ class PageThree(tk.Frame):
         entry.pack()
 
         button2 = ttk.Button(self, text="send your text to Ard",
-         command=lambda: write(entry.get()))
+         command=lambda: [write(entry.get()), write_servo("0")])
         button2.pack() 
 
         MyText2 = "R B: Type in the number of ml"
@@ -143,7 +147,7 @@ class PageThree(tk.Frame):
         entry.pack()
 
         button3 = ttk.Button(self, text="send your text to Ard",
-         command=lambda: write(entry.get()))
+         command=lambda: [write(entry.get()), write_servo("1")])
         button3.pack() 
 gui=Main()
 gui.mainloop()
