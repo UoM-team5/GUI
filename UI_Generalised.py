@@ -17,6 +17,41 @@ def write(x):
     time.sleep(0.05)
     print(x)
 
+value = ''
+
+def SERIAL_READ_LINE(DEV):
+    try:
+        Incoming_Data = DEV.readline().decode('UTF-8').replace('\r\n','') 
+        return Incoming_Data
+    except (NameError,IOError,ValueError):
+            pass
+    return -1
+
+def SERIAL_WRITE_LINE(DEV,COMMAND):
+    try:
+        DEV.write(COMMAND.encode('UTF-8'))
+        return 1
+    except:
+        return -1
+
+def WRITE(DEV,COMMAND):
+    global value
+    STATE = -1
+    TRY = 0
+    while(STATE == -1):
+        STATE = SERIAL_WRITE_LINE(DEV,COMMAND)
+        TRY = TRY + 1
+        if(TRY>10):
+            value = -1
+    STATE = -1
+    TRY = 0
+    while(STATE == -1):
+        STATE = SERIAL_READ_LINE(DEV)
+        TRY = TRY + 1
+        if(TRY>10):
+            value =-1
+    value = STATE
+
 def write_servo(x):
     # UNcomment 2 next lines for arduino comm
     arduino_servo.write(bytes(x, 'utf-8'))
@@ -150,7 +185,20 @@ class PageThree(tk.Frame):
         entry1.pack()
 
         button3 = ttk.Button(self, text="send your text to Ard",
-         command=lambda: [write(entry1.get()), write_servo("1,0")])
+         command=lambda: [write("0,"+ entry1.get()), write_servo("1,0")])
         button3.pack() 
+
+        button4 = ttk.Button(self, text="Is there Liquid?",
+         command=lambda: [WRITE(arduino, "1,0"), update_txt()])
+        button4.pack() 
+
+        my_string_var = tk.StringVar()
+
+        def update_txt():
+            my_string_var.set(value)
+
+        my_label = tk.Label(self,
+            textvariable = my_string_var)
+        my_label.pack()
 gui=Main()
 gui.mainloop()
