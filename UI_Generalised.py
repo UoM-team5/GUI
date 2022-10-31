@@ -63,7 +63,6 @@ BUTTON_FONT= ("Verdana", 10)
 
 
 
-
 # UI 
 class Main(tk.Tk):
     def __init__(self, *args, **kwargs):
@@ -200,5 +199,6 @@ class PageThree(tk.Frame):
         my_label = tk.Label(self,
             textvariable = my_string_var)
         my_label.pack()
+
 gui=Main()
 gui.mainloop()
