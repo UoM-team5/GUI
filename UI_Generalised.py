@@ -4,7 +4,10 @@ import serial
 import time
 
 # uncomment next line for arduino comm
-arduino = serial.Serial(port='COM6', baudrate=9600, timeout=.1)
+try:
+    arduino = serial.Serial(port='COM6', baudrate=9600, timeout=.1)
+except:
+    pass
 arduino_servo = serial.Serial(port='COM7', baudrate=115200, timeout=.1)
 
 # Send stuff to arduino through Serial
@@ -131,11 +134,11 @@ class PageThree(tk.Frame):
         T1.insert(tk.END, MyText)
         T1.pack()
 
-        entry = ttk.Entry(self)
-        entry.pack()
+        entry0 = ttk.Entry(self)
+        entry0.pack()
 
         button2 = ttk.Button(self, text="send your text to Ard",
-         command=lambda: [write(entry.get()), write_servo("0")])
+         command=lambda: write_servo("1,"+entry0.get()))
         button2.pack() 
 
         MyText2 = "R B: Type in the number of ml"
@@ -143,11 +146,11 @@ class PageThree(tk.Frame):
         T2.insert(tk.END, MyText2)
         T2.pack()
 
-        entry = ttk.Entry(self)
-        entry.pack()
+        entry1 = ttk.Entry(self)
+        entry1.pack()
 
         button3 = ttk.Button(self, text="send your text to Ard",
-         command=lambda: [write(entry.get()), write_servo("1")])
+         command=lambda: [write(entry1.get()), write_servo("0,0")])
         button3.pack() 
 gui=Main()
 gui.mainloop()
