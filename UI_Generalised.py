@@ -138,7 +138,7 @@ class PageThree(tk.Frame):
         entry0.pack()
 
         button2 = ttk.Button(self, text="send your text to Ard",
-         command=lambda: write_servo("1,"+entry0.get()))
+         command=lambda: write_servo("0,"+entry0.get()))
         button2.pack() 
 
         MyText2 = "R B: Type in the number of ml"
@@ -150,7 +150,7 @@ class PageThree(tk.Frame):
         entry1.pack()
 
         button3 = ttk.Button(self, text="send your text to Ard",
-         command=lambda: [write(entry1.get()), write_servo("0,0")])
+         command=lambda: [write(entry1.get()), write_servo("1,0")])
         button3.pack() 
 gui=Main()
 gui.mainloop()
