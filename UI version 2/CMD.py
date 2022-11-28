@@ -1,6 +1,14 @@
 import Serial_lib as com 
 import time
 
+class Create_command():
+    def __init__(self):
+        pass
+
+
+def get_component_device_id(component_type, component_num=1):
+    return
+
 # Command encoder
 def valve(Valve_num, state):
     command = "[sID1000 rID1001 PK2 V{} S{}]".format(Valve_num, state)
@@ -16,8 +24,12 @@ def shutter(state, shutter_num=1):
     command = "[sID1000 rID1001 PK2 I{} S{}]".format(shutter_num, state)
     return command
 
+def mixer(speed, time):
+    return
+
 def Sensor_read():
     return "[sID1000 rID1001 PK1 R]"
+
 
 #arduino output decoder
 def decode_output(ard_out):
@@ -45,21 +57,10 @@ def BUFFER_IN(CMD_BUFFER, COMMAND):
 def BUFFER_OUT(DEV, CMD_BUFFER):
     if len(CMD_BUFFER)>0:
         command = CMD_BUFFER.pop(0)
-        print("Send to arduino: ", command)
         response = com.WRITE(DEV, command)
         return CMD_BUFFER, response
 
 def CLEAR_BUFFER(CMD_BUFFER):
-    return
+    CMD_BUFFER = []
+    return CMD_BUFFER
 
-"""
-buffer = []
-recipe_1 = [valve(1,0), pump(1, 50.2), valve(1,1), valve(2,0), pump(1,21), shutter(0), shutter(1)]
-for i in recipe_1:
-    buffer = BUFFER_IN(buffer, i)
-print(buffer)
-
-while len(buffer)>0:
-    buffer = BUFFER_OUT(buffer)
-    time.sleep(2) 
-"""

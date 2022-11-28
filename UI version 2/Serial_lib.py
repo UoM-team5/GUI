@@ -52,6 +52,7 @@ def decode_lines(cmd_list):
 
 def SERIAL_WRITE_LINE(DEV,COMMAND):
     try:
+        print("\nSent to Serial ==>", COMMAND)
         DEV.write(COMMAND.encode('UTF-8'))
         return 1
     except:
@@ -80,6 +81,4 @@ def FLUSH_PORT(DEV):
             DEV[i].flushInput()
     except:
         pass
-
-
 
