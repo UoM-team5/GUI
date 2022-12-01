@@ -12,7 +12,6 @@ frame_styles = {"relief": "groove",
                 "bd": 3, "bg": "#f0a000",
                 "fg": "#073bb3", "font": ("Arial", 9, "bold")}
                 
-
                 
 #global variables 
 lastmessage = ""
@@ -142,11 +141,7 @@ class PageOne(tk.Frame):
         label = tk.Label(self, text = "control my valve", font=LARGE_FONT)
         label.pack(pady=10,padx=10)
         
-        def button(text, function):
-            button2 = ttk.Button(self, text="close my valve :(",
-                command=lambda: cmd.BUFFER_IN(buffer, cmd.valve(1,0)))
-        def 
-        button2.pack()
+        
 
         button2 = ttk.Button(self, text="close my valve :(",
          command=lambda: cmd.BUFFER_IN(buffer, cmd.valve(1,0)))
