@@ -31,12 +31,7 @@ def Sensor_read():
     return "[sID1000 rID1001 PK1 R]"
 
 
-#arduino output decoder
-def decode_output(ard_out):
-    #com standard -: return output
-    if ard_out[0:-1]=="[]":
-        if "ERR" in ard_out:
-            return 
+
 
 # FIFO Buffer
 def BUFFER_IN(CMD_BUFFER, COMMAND):

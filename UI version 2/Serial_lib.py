@@ -37,18 +37,90 @@ def OPEN_SERIAL_PORTS(DEVS):
 def SERIAL_READ_LINE(DEV):
     try:
         Incoming_Data = DEV.readlines()
-        Incoming_Data = decode_lines(Incoming_Data)
+        Incoming_Data = DECODE_LINES(Incoming_Data)
         FLUSH_PORT(DEV) 
         return Incoming_Data
     except (NameError,IOError,ValueError):
             pass
     return -1
 
-def decode_lines(cmd_list):
+def DECODE_LINES(cmd_list):
     for i in range(0,len(cmd_list)):
         cmd_list[i] = cmd_list[i].decode('UTF-8').replace('\r\n','')
+        cmd_list[i] = decode_output(cmd_list[i])
         print(cmd_list[i])
     return cmd_list
+
+def decode_output(command):
+    if command[0]!="[" or command[-1]!="]":
+        return command #print("this is not valid: ", command)
+    cmd_strip = command[1:-1]
+    cmd_split = cmd_strip.split(" ", 2)
+    senderID = cmd_split[0][3:]
+    receiveID = cmd_split[1]
+    PK = cmd_split[2]
+    return PACKAGE_DECODE(senderID, PK)
+
+def PACKAGE_DECODE(senderID, PK):
+    n_pk = int(PK[2:4])
+    pk_split = PK.split(" ", n_pk)
+    operator = pk_split[1]
+    out = str(senderID)
+    match operator[0]:
+        case "E":
+            out += " ERROR"
+            match operator[3]:
+                case "0":
+                    return (out + " 0: Incorrect packet format")
+                case "1":
+                    return (out + " 1: Packet missing items")
+                case "2":
+                    return (out + " 2: Incorrect Device ID")
+                case "3":
+                    return (out + " 3: Incorrect Sender ID")
+                case "4":
+                    return (out + " 4: System is in error state.")
+                case _:
+                    print("Unkown Error number {}".format(operator[3]))
+
+        case "A":
+            return (out + " Acknowledge")
+
+        case "B":
+            return (out + " BUSY")
+        
+        case "F":
+            return (out + " FREE")
+        
+        case "P":
+            out += " Pump "
+            pump_num = operator[1]
+            volume = pk_split[2][1:]
+            direction = pk_split[3][1:]
+            #save values somewhere
+            return (out + pump_num + " amount: " + volume)
+        
+        case "T":
+            out += " sensors "
+            sensor_amount = int((n_pk)/2)
+            Temp=[0.0]*5
+            bubb=[0]*5
+            for i in range(sensor_amount):
+                sensor_type = pk_split[2*i+1][0]
+                sensor_num = int(pk_split[2*i+1][1:])
+                sensor_val = float(pk_split[2*i+2][1:])
+                #print(i, sensor_type, sensor_num, sensor_val)
+                if sensor_type == "T":
+                    Temp[sensor_num-1] = sensor_val
+                elif sensor_type == "B":
+                    bubb[sensor_num-1] = int(sensor_val)
+                else:
+                    print("unknown sensor")
+            return out + " Temperature: " + str(Temp) + " bubble " + str(bubb)
+
+        case _:
+            return out + " unrecognised package: " + PK
+
 
 def SERIAL_WRITE_LINE(DEV,COMMAND):
     try:

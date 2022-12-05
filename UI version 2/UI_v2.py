@@ -304,12 +304,10 @@ def task():
     if (arduino_servo.inWaiting() > 0):
         messages = com.SERIAL_READ_LINE(arduino_servo)
         lastmessage = messages[-1]
-        lastmessage = lastmessage[-5:-1]
         print("\nthe last message is ==>", lastmessage, "\n")
     if ("FREE" in lastmessage and len(buffer)>0):
         buffer,response = cmd.BUFFER_OUT(arduino_servo, buffer)
         lastmessage = response[len(response)-1]
-        lastmessage = lastmessage[-5:-1]
 
     gui.after(100, task)
     time.sleep(0.01)
