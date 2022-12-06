@@ -71,6 +71,7 @@ def PACKAGE_DECODE(senderID, PK):
             out += " ERROR"
             match operator[3]:
                 case "0":
+                    #try again 10 times
                     return (out + " 0: Incorrect packet format")
                 case "1":
                     return (out + " 1: Packet missing items")
@@ -88,17 +89,18 @@ def PACKAGE_DECODE(senderID, PK):
 
         case "B":
             return (out + " BUSY")
-        
+
+        case "V":
+            ## LOG DATA HERE!!!
+            #get the command that you sent to arduino 
+            PK = PK
+            print(PK)
+            senderID = senderID
+
+            return (out + " VALID")
+
         case "F":
             return (out + " FREE")
-        
-        case "P":
-            out += " Pump " 
-            pump_num = operator[1]
-            volume = pk_split[2][1:]
-            direction = pk_split[3][1:]
-            #save values somewhere
-            return (out + pump_num + " amount: " + volume)
         
         case "T":
             out += " sensors "
@@ -121,7 +123,7 @@ def PACKAGE_DECODE(senderID, PK):
         case _:
             return out + " unrecognised package: " + PK
 
-print(decode_output("[sID1000 rID1001 PK4 SEN T1 S2 B1 T5 ]"))
+
 def SERIAL_WRITE_LINE(DEV,COMMAND):
     try:
         print("\nSent to Serial ==>", COMMAND)

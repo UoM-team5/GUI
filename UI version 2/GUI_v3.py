@@ -256,7 +256,7 @@ class PageFive(tk.Frame):
         e_Ra_ml_init = entry_block("Ra:", [1,0])
         e_Ra_step = entry_block("step:",[1,2])
         e_Ra_flowrate = entry_block("Flow rate:",[1,4])
-        e_Rb_ml = entry_block("Rb:",[2,0])
+        e_Rb_ml_init = entry_block("Rb:",[2,0])
         e_Rb_step = entry_block("step:",[2,2])
         e_Rb_flowrate = entry_block("Flow rate:",[2,4])
         e_Ra_total = entry_block("Total Ra:", [3,0])
@@ -273,7 +273,7 @@ class PageFive(tk.Frame):
             cmd_list = []
             Ra_ml_init = e_Ra_ml_init.get()
             Ra_step = e_Ra_step.get()
-            Rb_ml = e_Rb_ml.get()
+            Rb_ml_init = e_Rb_ml_init.get()
             Rb_step = e_Rb_step.get()
             count = int(e_count.get())
             Ra_flowrate = e_Ra_flowrate.get()
@@ -282,17 +282,17 @@ class PageFive(tk.Frame):
             Rb_total = e_Rb_total.get()
             nowTime = datetime.datetime.now()
            
-            data_list= np.zeros((count,10))
+            data_list= np.zeros(count,10)
             Ra_ml = 0.0
-            
+            Rb_ml = 0.0
+
             for i in range(count):
                 if Ra_ml_init!="" and Ra_step!="": 
-                    Ra_ml = float(Ra_ml_init) + float(Ra_step)*i
-                    data_list[i,0] = Ra_ml
+                    n = float(Ra_ml_init) + float(Ra_step)*i
                     cmd_list.append(cmd.pump(1, Ra_ml))
-                if Rb_ml!="" and Rb_step!="":
+                if Rb_ml_init!="" and Rb_step!="":
                     Ra_ml = float(Ra_ml) + float(Rb_step)*i
-                    cmd_list.append(cmd.pump(1, float(Rb_ml)))
+                    cmd_list.append(cmd.pump(1, float(Rb_ml_init)))
                 
                 hour = nowTime.hour
                 minute= nowTime.minute
