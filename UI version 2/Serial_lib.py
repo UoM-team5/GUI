@@ -93,7 +93,7 @@ def PACKAGE_DECODE(senderID, PK):
             return (out + " FREE")
         
         case "P":
-            out += " Pump "
+            out += " Pump " 
             pump_num = operator[1]
             volume = pk_split[2][1:]
             direction = pk_split[3][1:]
@@ -121,7 +121,7 @@ def PACKAGE_DECODE(senderID, PK):
         case _:
             return out + " unrecognised package: " + PK
 
-
+print(decode_output("[sID1000 rID1001 PK4 SEN T1 S2 B1 T5 ]"))
 def SERIAL_WRITE_LINE(DEV,COMMAND):
     try:
         print("\nSent to Serial ==>", COMMAND)

@@ -1,8 +1,15 @@
 import time
+import csv
+import datetime
 import tkinter as tk
 from tkinter import ttk
 import Serial_lib as com 
 import CMD as cmd
+import numpy as np
+
+from matplotlib.backends.backend_tkagg import (
+    FigureCanvasTkAgg, NavigationToolbar2Tk)
+from matplotlib.figure import Figure
 
 LARGE_FONT= ("Verdana", 20)
 NORMAL_FONT= ("Verdana", 15)
@@ -45,7 +52,7 @@ class initialise(tk.Tk):
         self.resizable(0, 0)  # This prevents any resizing of the screen
         self.title("Initialisation")
 
-        title = tk.Label(main_frame, text = "the Start Page", font=LARGE_FONT)
+        title = tk.Label(main_frame, text = "Initialisation", font=LARGE_FONT)
         title.pack(pady=10,padx=10)
         
 

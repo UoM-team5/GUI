@@ -253,7 +253,7 @@ class PageFive(tk.Frame):
             entry.grid(row=row, column=col+1, sticky='W')
             return entry
 
-        e_Ra_ml = entry_block("Ra:", [1,0])
+        e_Ra_ml_init = entry_block("Ra:", [1,0])
         e_Ra_step = entry_block("step:",[1,2])
         e_Ra_flowrate = entry_block("Flow rate:",[1,4])
         e_Rb_ml = entry_block("Rb:",[2,0])
@@ -271,7 +271,7 @@ class PageFive(tk.Frame):
 
         def send_command():
             cmd_list = []
-            Ra_ml = e_Ra_ml.get()
+            Ra_ml_init = e_Ra_ml_init.get()
             Ra_step = e_Ra_step.get()
             Rb_ml = e_Rb_ml.get()
             Rb_step = e_Rb_step.get()
@@ -283,22 +283,26 @@ class PageFive(tk.Frame):
             nowTime = datetime.datetime.now()
            
             data_list= np.zeros((count,10))
-
+            Ra_ml = 0.0
+            
             for i in range(count):
-                if Ra_ml!="" and Ra_step!="":
-                    Ra_ml = float(Ra_ml) + float(Ra_step)*i
+                if Ra_ml_init!="" and Ra_step!="": 
+                    Ra_ml = float(Ra_ml_init) + float(Ra_step)*i
+                    data_list[i,0] = Ra_ml
                     cmd_list.append(cmd.pump(1, Ra_ml))
                 if Rb_ml!="" and Rb_step!="":
                     Ra_ml = float(Ra_ml) + float(Rb_step)*i
                     cmd_list.append(cmd.pump(1, float(Rb_ml)))
-
+                
                 hour = nowTime.hour
                 minute= nowTime.minute
                 second= nowTime.second
 
+                
                 for j in range(10):
                     if j == 0:
                         data_list[i,j] = Ra_ml
+                        print(Ra_ml)
                     elif j == 1:
                         data_list[i,j] = Rb_ml
                     elif j == 2:
@@ -332,8 +336,7 @@ class PageFive(tk.Frame):
             return
         
         
-        
-
+    
 class OpenNewWindow(tk.Tk):
 
     def __init__(self, *args, **kwargs):
@@ -380,19 +383,16 @@ def task():
     if (arduino_servo.inWaiting() > 0):
         messages = com.SERIAL_READ_LINE(arduino_servo)
         lastmessage = messages[-1]
-        lastmessage = lastmessage[-5:-1]
         print("\nthe last message is ==>", lastmessage, "\n")
     if ("FREE" in lastmessage and len(buffer)>0):
         buffer,response = cmd.BUFFER_OUT(arduino_servo, buffer)
         lastmessage = response[len(response)-1]
-        lastmessage = lastmessage[-5:-1]
 
     gui.after(100, task)
     time.sleep(0.01)
-
 #initialisation 
-init = initialise()
-init.mainloop()
+# init = initialise()
+# init.mainloop()
 
 #GUI
 gui = Main()
