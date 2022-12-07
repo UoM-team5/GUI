@@ -1,15 +1,9 @@
 import time
-import csv
-import datetime
 import tkinter as tk
 from tkinter import ttk
 import Serial_lib as com 
 import CMD as cmd
-import numpy as np
 
-from matplotlib.backends.backend_tkagg import (
-    FigureCanvasTkAgg, NavigationToolbar2Tk)
-from matplotlib.figure import Figure
 
 LARGE_FONT= ("Verdana", 20)
 NORMAL_FONT= ("Verdana", 15)
@@ -310,18 +304,18 @@ def task():
     global buffer
     if (arduino_servo.inWaiting() > 0):
         messages = com.SERIAL_READ_LINE(arduino_servo)
-        lastmessage = messages[-1]
+        lastmessage = messages[len(messages)-1]
         print("\nthe last message is ==>", lastmessage, "\n")
     if ("FREE" in lastmessage and len(buffer)>0):
-        buffer,response = cmd.BUFFER_OUT(arduino_servo, buffer)
-        lastmessage = response[len(response)-1]
+        buffer,lastmessage = cmd.BUFFER_OUT(arduino_servo, buffer)
+    
 
     gui.after(100, task)
     time.sleep(0.01)
 
 #initialisation 
-init = initialise()
-init.mainloop()
+# init = initialise()
+# init.mainloop()
 
 #GUI
 gui = Main()

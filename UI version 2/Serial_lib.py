@@ -93,9 +93,8 @@ def PACKAGE_DECODE(senderID, PK):
         case "V":
             ## LOG DATA HERE!!!
             #get the command that you sent to arduino 
-            PK = PK
-            print(PK)
             senderID = senderID
+            #log_valid_cmd()
 
             return (out + " VALID")
 
@@ -122,7 +121,6 @@ def PACKAGE_DECODE(senderID, PK):
 
         case _:
             return out + " unrecognised package: " + PK
-
 
 def SERIAL_WRITE_LINE(DEV,COMMAND):
     try:

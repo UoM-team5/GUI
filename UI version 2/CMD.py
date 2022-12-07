@@ -51,9 +51,19 @@ def BUFFER_IN(CMD_BUFFER, COMMAND):
     
 def BUFFER_OUT(DEV, CMD_BUFFER):
     if len(CMD_BUFFER)>0:
-        command = CMD_BUFFER.pop(0)
+        command = CMD_BUFFER[0]
         response = com.WRITE(DEV, command)
-        return CMD_BUFFER, response
+        last_response = response[len(response)-1]
+
+        i=3
+        print("the last error response is here: ", last_response)
+        if ("ERR" in last_response) and i!=0:
+            response = com.WRITE(DEV, command)
+            i=i-1
+            print("I tried talking to him {i} times.\n enters one ear, exits the other")
+        CMD_BUFFER.pop(0)
+        return CMD_BUFFER, last_response
+
 
 def CLEAR_BUFFER(CMD_BUFFER):
     CMD_BUFFER = []
