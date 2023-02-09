@@ -445,4 +445,3 @@ def task():
 #GUI
 gui = Main()
 gui.after(100,task)
-gui.mainloop()
