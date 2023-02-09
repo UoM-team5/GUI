@@ -32,7 +32,6 @@ def Sensor_read():
 
 
 
-
 # FIFO Buffer
 def BUFFER_IN(CMD_BUFFER, COMMAND):
     if type(COMMAND) is str:

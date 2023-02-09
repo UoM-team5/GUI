@@ -6,6 +6,7 @@ from tkinter import ttk
 import Serial_lib as com 
 import CMD as cmd
 import numpy as np
+import random
 
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
@@ -22,6 +23,7 @@ frame_styles = {"relief": "groove",
 
                 
 #global variables 
+liquid_sensor = 1
 lastmessage = ""
 buffer = []
 recipe_1 = [cmd.valve(1,0), cmd.pump(1, 50.2), cmd.valve(1,1), cmd.valve(2,0)]
@@ -41,6 +43,29 @@ arduinos = BEGIN_SERIAL([])
 def update_label(label, new_text):
     label.configure(text = new_text)
     return label
+
+def measure():
+    liquid_sensor = random.randint(0,1)
+    print(liquid_sensor)
+    if liquid_sensor == 1:
+        popupmsg("Warning: container full")
+    if liquid_sensor == 0:
+        popupmsg("You can keep pumping")
+
+
+def popupmsg(msg):
+    popup = tk.Tk()
+
+    def leavemini():
+        popup.destroy()
+
+    popup.wm_title("Liquid detection measurement")
+    label = ttk.Label(popup, text = msg, font = NORMAL_FONT)
+    label.pack(side="top", fill="x", pady=10)
+    b1 = ttk.Button(popup, text = "Ok", command = leavemini)
+    b1.pack()
+    popup.mainloop()
+
 
 class initialise(tk.Tk):
     def __init__(self, *args, **kwargs):
@@ -116,7 +141,7 @@ class Main(tk.Tk):
 
         self.frames = {}
 
-        for F in (StartPage, PageOne, PageTwo, PageThree, PageFour, PageFive):
+        for F in (StartPage, PageOne, PageTwo, PageThree, PageFour, PageFive, PageSix):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -140,6 +165,12 @@ class StartPage(tk.Frame):
         tk.Frame.__init__(self,parent, bg = frame_styles["bg"])
         title = tk.Label(self, text = "Home", font=LARGE_FONT)
         title.pack(pady=10,padx=10)
+
+        button = ttk.Button(self, text="go to page 6",
+         command=lambda: controller.show_frame(PageSix))
+        button.pack()
+
+       
 
 class PageOne(tk.Frame):
 
@@ -335,8 +366,17 @@ class PageFive(tk.Frame):
             cmd.BUFFER_IN(buffer, cmd_list)
             return
         
-        
-    
+class PageSix(tk.Frame):
+
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self,parent, bg = frame_styles["bg"])
+        label = tk.Label(self, text = "Liquid Level", font=LARGE_FONT)
+        label.pack(pady=10,padx=10)
+
+        buttonN = ttk.Button(self, text="Request sensor measurement",
+         command=lambda: measure())
+        buttonN.pack()
+ 
 class OpenNewWindow(tk.Tk):
 
     def __init__(self, *args, **kwargs):
