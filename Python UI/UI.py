@@ -61,6 +61,13 @@ def add_image(file_name, frame, relx, rely, anchor='center'):
     label.image = carap
     label.place(relx = relx, rely = rely, anchor = anchor)
 
+def bttn_image(frame, text, file_name):
+    photo = ImageTk.PhotoImage(Image.open(os.path.join(os.path.dirname(os.path.realpath(__file__)), file_name), "r"))
+    bttn1 = ttk.Button(frame, text=text, image = photo, compound = 'left')
+    bttn1.image = photo
+    return bttn1
+
+
 def entry_block(text: str, frame, spin=False):
     """label followed by entry widget"""
     lbl_T = tk.Label(frame, label_styles, text = text)
@@ -271,7 +278,7 @@ class PageTwo(tk.Frame):
         label = tk.Label(self, text = "Recipe", font=LARGE_FONT, bg = styles["bg"])
         label.pack(pady=10,padx=10)
 
-        bttn1 = ttk.Button(self, text="Open Camera", command=lambda: camera())
+        bttn1 = bttn_image(self, "whatever", "frog.png")
         bttn1.pack(pady=10,padx=10)
 
 class PageThree(tk.Frame):
