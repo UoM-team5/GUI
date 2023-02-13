@@ -14,12 +14,26 @@ def ID_PORTS_AVAILABLE():
     
     return devices
 
+def OPEN_SERIAL_PORT(DEV):
+    try:
+        Dev = serial.Serial(port=DEV,baudrate=115200, timeout=.1)
+        Dev.isOpen()
+    except IOError:
+        Dev.close()
+        Dev = serial.Serial(port=DEV,baudrate=115200, timeout=.1)
+        Dev.isOpen()
+    except (OSError, serial.SerialException,ValueError):
+        pass
+    
+    return Dev
+
 def OPEN_SERIAL_PORTS(DEVS):
     DEVICES = []
     try:
         for i in range(len(DEVS)):
             try:
                 Dev = serial.Serial(port=DEVS[i],baudrate=115200, timeout=.1)
+                print(Dev)
                 Dev.isOpen()
                 DEVICES.append(Dev)
             except IOError:
@@ -67,11 +81,13 @@ def DECODE_PACKAGE(senderID, PK):
     operator = pk_split[1]
     out = str(senderID)
     match operator[0]:
+        case "P":
+            #[sID... rID... PK6 P1 V0 I0 M1 T1 B1 DeviceDesc]
+            return senderID, pk_split
         case "E":
             out += " ERROR"
             match operator[3]:
                 case "0":
-                    #try again 10 times
                     return (out + " 0: Incorrect packet format")
                 case "1":
                     return (out + " 1: Packet missing items")
@@ -90,12 +106,8 @@ def DECODE_PACKAGE(senderID, PK):
         case "B":
             return (out + " BUSY")
 
-        case "V":
-            ## LOG DATA HERE!!!
-            #buffer pop
-            #get the command that you sent to arduino 
+        case "V": 
             senderID = senderID
-            #log_valid_cmd()
 
             return (out + " VALID")
 
@@ -155,59 +167,150 @@ def FLUSH_PORT(DEV):
     except:
         pass
 
+#components
+class Pump:
+    def __init__(self, device, ID, component_number: int, buffer):
+        self.device = device
+        self.ID = ID
+        self.buffer = buffer
+        self.num = component_number
+        self.state = False
+    
+    def pump(self, volume: float, direction=1):
+       self.buffer.IN([self.device, "[sID1000 rID{} PK3 P{} m{:.2f} D{}]".format(self.ID, self.num, volume, direction)])
+    
+    def set_state(self, state: bool):
+        """Param bool state: set False->idle, True->used"""
+        self.state = state
+    
+    def get_state(self):
+        return self.state
 
-# Functions to Generate Commands
-def valve(Valve_num, state):
-    command = "[sID1000 rID1001 PK2 V{} S{}]".format(Valve_num, state)
-    return command
+class Valve:
+    def __init__(self, device, ID, component_number: int, buffer):
+        self.device = device
+        self.ID = ID
+        self.num = component_number
+        self.buffer = buffer
+        self.state = False
+         
+    def close(self):
+        self.buffer.IN([self.device, "[sID1000 rID{} PK2 V{} S0]".format(self.ID, self.num)])
 
-def pump(Pump_num, amount, dir=1):
-    # "[sID1000 rID1001 PK3 P2 m50.25 D1]"
-    command = "[sID1000 rID1001 PK3 P{} m{:.2f} D{}]".format(Pump_num, amount, dir)
-    return command
+    def open(self):
+        self.buffer.IN([self.device, "[sID1000 rID{} PK2 V{} S1]".format(self.ID, self.num)])
 
-def shutter(state, shutter_num=1):
-    # "[sID1000 rID1001 PK2 I1 S0]"
-    command = "[sID1000 rID1001 PK2 I{} S{}]".format(shutter_num, state)
-    return command
+    def set_state(self, state: bool):
+        """Param bool state: set False->closed, True->open"""
+        self.state = state
+    
+    def get_state(self):
+        return self.state
 
-def mixer(speed, time):
-    return
+class Mixer:
+    def __init__(self, deviceID, component_number):
+        self.deviceID = deviceID
+        self.num = component_number
 
-def Sensor_read():
-    return "[sID1000 rID1001 PK1 R]"
+    def mix(self, time):
+        return "[sID1000 rID{} PK2 M{} S1]".format(self.deviceID, self.num)
 
+class Sensor:
+    pass
+
+class Vessel: 
+    def __init__(self, component_number: int, liquid_name: str, volume: float):
+        self.num = component_number
+        self.name = liquid_name
+        self.vol = volume
+    
+    def sub(self, volume: float):
+        self.vol = self.vol - volume
+
+    def add(self, volume: float):
+        self.vol = self.vol + volume
+    
+    def get_volume(self):
+        return self.vol
+    
+    def set_volume(self, volume: float):
+        self.vol = volume
+
+    def get_name(self):
+        return self.name
+    
+#arduinos
+class Nano:
+    def __init__(self, device, ID):
+        self.device = device
+        self.ID = ID
+        self.components = []
+        self.state = False
+        self.message = ""
+
+    def get_id(self):
+        #print(self.ID)
+        return self.ID
+
+    def get_device(self):
+        return self.device
+
+    def add_component(self, component):
+        self.components.append(component)
+
+    def toggle_state(self):
+        self.state = not self.state
+    
+    def free(self):
+        self.state = False
+
+    def busy(self):
+        self.state = True
+
+    def get_state(self):
+        # print("Device " + str(self.get_id) + "is " + str(self.state))
+        return self.state
+    
+    def add_message(self, message):
+        self.message = message
+    
+    def read_last(self):
+        return self.message
 
 # FIFO Buffer
 class Buffer:
-    def __init__(self):
+    def __init__(self, size=20):
         self.buffer = []
+        self.size = size
 
-    def IN(self, COMMAND):
-        if type(COMMAND) is str:
-            if len(self.buffer)<15:
-                self.buffer.append(COMMAND)
-            else:
-                print("BUFFER_FULL, try later")
-        if type(COMMAND) is list:
-            if len(self.buffer)<15:
-                for element in COMMAND:
-                    self.buffer.append(element)
-            else:
-                print("BUFFER_FULL, try later")
+    def IN(self, device_command: list):
+        if len(self.buffer)<self.size:
+            self.buffer.append(device_command)
+        else: 
+            print("buffer full")
 
-    def OUT(self, DEV):
+    def OUT(self):
         if len(self.buffer):
-            command = self.buffer[0]
-            messages = WRITE(DEV, command)
-            last = messages[len(messages)-1]
-            return last
+            device, command = self.buffer[0]
+            SERIAL_WRITE_LINE(device, command)
 
     def POP(self):
         if len(self.buffer):
-            print("POPING")
+            print("POP")
             self.buffer.pop(0)
 
-    def READ(self):
+    def READ(self) :
+        # print("length: ", len(self.buffer))
+        # print("\nBuffer Contents:\n", *[i[1] for i in self.buffer], sep = "\n")
         return self.buffer
+
+    def LENGTH(self):
+        #print("length of buffer:", len(self.buffer))
+        return len(self.buffer)
+
+    def RESET(self):
+        self.buffer = []
+
+
+
 

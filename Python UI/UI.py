@@ -1,79 +1,126 @@
 import time
 import tkinter as tk
 from tkinter import ttk
+from PIL import ImageTk, Image
+import os
 import Serial_lib as com 
+import cv2 
 
-LARGE_FONT= ("Verdana", 20)
-NORMAL_FONT= ("Verdana", 15)
-SMALL_FONT= ("Verdana", 10)
 
-frame_styles = {"relief": "groove",
-                "bd": 3, "bg": "#f0a000",
-                "fg": "#073bb3", "font": ("Arial", 9, "bold")}
-                      
-#global variables 
-lastmessage = ""
-messages = []
+#init comms
+
 buffer = com.Buffer()
-recipe_1 = [com.valve(1,0), com.pump(1, 5.2), com.valve(1,1)]
+def init_module():
+    global arduino, V, P
+    arduino = []
+    V = [0]
+    P = [0]
+    Ports = com.ID_PORTS_AVAILABLE()
+    for i in range(len(Ports)):
+        print("\nSource: ", Ports[i])
+        device = com.OPEN_SERIAL_PORT(Ports[i])
+        print("\nDevice: ", device)
+        while(device.inWaiting() == 0):
+            time.sleep(0.1)
 
-def BEGIN_SERIAL(arduinos):
-    global arduino_servo
-    arduinos = com.OPEN_SERIAL_PORTS(com.ID_PORTS_AVAILABLE())
-    if len(arduinos)>0:
-        arduino_servo = arduinos[0]
-    else:
-        arduino_servo = ""
-    return arduinos
-    
-arduinos = BEGIN_SERIAL([])
+        message = com.SERIAL_READ_LINE(device)
+        deviceID  = message[0][0:4]
+        print("\narduino: ", deviceID)
+        arduino.append(com.Nano(device, deviceID))
+        if deviceID=="1001":
+            V1 = com.Valve(device, deviceID, 1, buffer)
+            V2 = com.Valve(device, deviceID, 2, buffer)
+            V3 = com.Valve(device, deviceID, 3, buffer)
+            V = [V1,V2,V3]
+            P1 = com.Pump(device, deviceID, 1, buffer)
+            P2 = com.Pump(device, deviceID, 2, buffer)
+            P = [P1, P2]
+        #TO DO: Build CSV table and initialise components
 
-# UI 
+    print("\n------------End initialisation--------------\n\n")
+    return
+
+# UI styles 
+LARGE_FONT= ("Arial", 20)
+styles = {"relief": "groove",
+                "bd": 3, "bg": "#DDDDDD",
+                "fg": "#073bb3", "font": ("Arial", 12, "bold")}
+entry_styles = {"relief": "groove", "width": 8,
+                "bd": 5, "font": ("Arial", 10, "normal")}
+label_styles = {"relief": "flat", "bg": "#DDDDDD",
+                "bd": 3, "font": ("Verdana", 10, "normal")}
+
+# UI functions
 def update_label(label, new_text):
     label.configure(text = new_text)
     return label
 
+def add_image(file_name, frame, relx, rely, anchor='center'):
+    carap = ImageTk.PhotoImage(Image.open(os.path.join(os.path.dirname(os.path.realpath(__file__)), file_name), "r"))
+    label = tk.Label(frame, image = carap)
+    label.image = carap
+    label.place(relx = relx, rely = rely, anchor = anchor)
+
+def entry_block(text: str, frame, spin=False):
+    """label followed by entry widget"""
+    lbl_T = tk.Label(frame, label_styles, text = text)
+    if (spin):
+        entry = tk.Spinbox(frame, from_=0, to=10, width=2, wrap=True)
+    else:
+        entry = ttk.Entry(frame, width=5)
+    return lbl_T, entry
+
+def place_entry_block(lbl_T, entry, pos):
+    lbl_T.place(relx = 0.6, rely = pos/6, anchor = 'e')
+    entry.place(relx = 0.62, rely = pos/6, anchor = 'w')
+
+def camera():
+    #While loop in function = everything else stops = bad
+    c = cv2.VideoCapture(0)
+    while(1):
+        _,f = c.read()
+        cv2.imshow('e2',f)
+        if cv2.waitKey(5)==27:
+            break
+    cv2.destroyAllWindows()
+
+# UI classes
 class initialise(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
 
-        main_frame = tk.Frame(self, bg="#708090", height=431, width=626)  # this is the background
+        main_frame = tk.Frame(self, bg=styles["bg"])  # this is the background
         main_frame.pack(fill="both", expand="true")
 
-        self.geometry("626x431")  # Sets window size to 626w x 431h pixels
-        self.resizable(0, 0)  # This prevents any resizing of the screen
+        self.geometry("600x400")  # 600w x 400h pixels
+        #self.resizable(0, 0)  # This prevents any resizing of the screen
         self.title("Initialisation")
 
-        title = tk.Label(main_frame, text = "Initialisation", font=LARGE_FONT)
-        title.pack(pady=10,padx=10)
+        title = tk.Label(main_frame, text = "Initialise", font=LARGE_FONT, bg = styles["bg"])
+        title.place(relx = 0.5, rely = 0.1, anchor = 'center')
         
+        def update_devices():
+            init_module()
+            #refer to actual object returned if none= do not update label
+            if len(arduino):
+                update_label(details, "arduino: '1001'\n2 Valve \n1 Pump")
+        
+        frame1 = tk.LabelFrame(main_frame, styles, text = "Setup communcation")
+        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+        
+        bttn1 = ttk.Button(frame1, text="Initialise",
+         command=lambda: update_devices())
+        bttn1.place(relx = 0.5, rely = 0.2, anchor = 'center') 
 
-        
-        def update_devices(label):
-            global arduinos
-            
-            com.FLUSH_PORT(com.ID_PORTS_AVAILABLE())
-            
-            arduinos = BEGIN_SERIAL(arduinos)
-            new_text = "there is {} arduinos connected".format(len(arduinos))
-            label = update_label(label,new_text)
-            print(arduinos)
-            return
-        
-        button1 = ttk.Button(main_frame, text="Check connections",
-         command=lambda: update_devices(label_arduino))
-        button1.pack()
+        ard_detail = "no arduino"
+        details = tk.Label(frame1, label_styles, text=ard_detail,justify= 'left')
+        details.place(relx = 0.5, rely = 0.5, anchor = 'center') 
 
-        button2 = ttk.Button(self, text="ask Details",
-         command=lambda: com.WRITE(arduino_servo, "[sID1000 rID1001 PK1 DETAIL]"))
-        button2.pack()  
-
-        label_arduino = tk.Label(main_frame, text ="there is {} arduinos connected".format(len(arduinos)), font=NORMAL_FONT)
-        label_arduino.pack()
-        
-        button2 = ttk.Button(main_frame, text="CONTINUE",
+        bttn2 = ttk.Button(frame1, text="FINISH",
          command=lambda: init.destroy())
-        button2.pack()
+        bttn2.place(relx = 0.5, rely = 0.9, anchor = 'center') 
+        
+        update_devices()
 
 class MenuBar(tk.Menu):
     def __init__(self, parent):
@@ -81,18 +128,13 @@ class MenuBar(tk.Menu):
 
         self.add_command(label="Home", command=lambda: parent.show_frame(StartPage))
 
-        manual_control = tk.Menu(self, tearoff=0)
-        self.add_cascade(label="Manual", menu=manual_control)
-        manual_control.add_command(label="Valve", command=lambda: parent.show_frame(PageOne))
-        manual_control.add_separator()
-        manual_control.add_command(label="Pump", command=lambda: parent.show_frame(PageTwo))
-        manual_control.add_command(label="Pumps", command=lambda: parent.show_frame(PageThree))
+        self.add_command(label="Manual", command=lambda: parent.show_frame(PageOne))
 
         menu_auto = tk.Menu(self, tearoff=0)
         self.add_cascade(label="Auto", menu=menu_auto)
-        menu_auto.add_command(label="Recipe", command=lambda: parent.show_frame(PageFour))
+        menu_auto.add_command(label="Recipe", command=lambda: parent.show_frame(PageTwo))
         menu_auto.add_separator()
-        menu_auto.add_command(label="iterate", command=lambda: parent.show_frame(PageFive))
+        menu_auto.add_command(label="iterate", command=lambda: parent.show_frame(PageThree))
 
         menu_help = tk.Menu(self, tearoff=0)
         self.add_cascade(label="plots", menu=menu_help)
@@ -102,16 +144,17 @@ class Main(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
 
-        tk.Tk.wm_title(self, "Hardware control")
+        tk.Tk.wm_title(self, "ARCaDIUS")
 
+        self.geometry("700x431") 
+        self.minsize(500,300) 
         container = tk.Frame(self, bg = "#BEB2A7", height=600, width=1024)
         container.pack(side="top", fill = "both", expand = "true")
         container.grid_rowconfigure(0, weight= 1)
         container.grid_columnconfigure(0, weight= 1)
-
         self.frames = {}
 
-        for F in (StartPage, PageOne, PageTwo, PageThree, PageFour, PageFive):
+        for F in (StartPage, PageOne, PageTwo, PageThree):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -132,116 +175,170 @@ class Main(tk.Tk):
 
 class StartPage(tk.Frame):
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self,parent, bg = frame_styles["bg"])
-        title = tk.Label(self, text = "Home", font=LARGE_FONT, bg = frame_styles["bg"])
-        title.pack(pady=10,padx=10)
+        tk.Frame.__init__(self,parent, bg = styles["bg"])
+        # title = tk.Label(self, text = "Home", font=LARGE_FONT, bg = styles["bg"])
+        # title.place(relx = 0.5, rely = 0.1, anchor = 'center')
+        add_image("arcadius.png", self, relx=0.5, rely=0.05, anchor = 'n')
 
-        button3 = ttk.Button(self, text="ask Details",
-         command=lambda: buffer.IN("[sID1000 rID1001 PK1 DETAIL]"))
-        button3.pack()  
+        frame1 = tk.LabelFrame(self, styles, text = "Menu")
+        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+
+        bttn1 = ttk.Button(frame1, text="Manual",
+         command=lambda: controller.show_frame(PageOne))
+        bttn1.place(relx = 0.48, rely = 0.2, anchor = 'e')
+
+        bttn2 = ttk.Button(frame1, text="Auto",
+         command=lambda: controller.show_frame(PageTwo))
+        bttn2.place(relx = 0.52, rely = 0.2, anchor = 'w')
+
+        bttn3 = ttk.Button(frame1, text="Details",
+         command=lambda: controller.show_frame(PageTwo))
+        bttn3.place(relx = 0.48, rely = 0.3, anchor = 'e')
+
+        bttn4 = ttk.Button(frame1, text="iterate",
+         command=lambda: controller.show_frame(PageThree))
+        bttn4.place(relx = 0.52, rely = 0.3, anchor = 'w')
+
+        
+        # add_image("carap.png", frame1, relx=1, rely=1, anchor = 'se')
+        # add_image("carap_flip.png", frame1, relx=0, rely=1, anchor = 'sw')
+        bttn4 = ttk.Button(frame1, text="Exit",
+         command=lambda: controller.Quit_application())
+        bttn4.place(relx = 0.5, rely = 0.9, anchor = 'center')
 
 class PageOne(tk.Frame):
 
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self,parent, bg = frame_styles["bg"])
-        label = tk.Label(self, text = "Valve Control", font=LARGE_FONT, bg = frame_styles["bg"])
-        label.grid(row=0, column= 2, columnspan=3)
+        tk.Frame.__init__(self,parent, bg = styles["bg"])
+        title = tk.Label(self, text = "Manual Control", font=LARGE_FONT, bg = styles["bg"])
+        title.place(relx = 0.5, rely = 0.05, anchor = 'center')
         
-        def entry_block(text, pos):
-            row,col = pos
-            T = tk.Label(self, text = text, font=SMALL_FONT, bg = frame_styles["bg"])
-            entry = ttk.Entry(self, width=8)
-            T.grid(row=row, column=col, sticky='E')
-            entry.grid(row=row, column=col+1, sticky='W')
-            return entry
+        frame1 = tk.LabelFrame(self, styles, text = "Valve")
+        frame1.place(relx=0.175, rely=0.15, relwidth=0.3, relheight=0.8, anchor = 'n')
 
-        valve_number = entry_block("Valve number: ", [1,1])
+        frame2 = tk.LabelFrame(self, styles, text = "Pump")
+        frame2.place(relx=0.5, rely=0.15, relwidth=0.3, relheight=0.8, anchor = 'n')
 
-        button2 = ttk.Button(self, text="close",
-         command=lambda: buffer.IN(com.valve(int(valve_number.get()),0)))
-        button2.grid(column=2, sticky='w')
+        frame3 = tk.LabelFrame(self, styles, text = "Mixer")
+        frame3.place(relx=0.825, rely=0.15, relwidth=0.3, relheight=0.38, anchor = 'n')
 
-        button3 = ttk.Button(self, text="open",
-         command=lambda: buffer.IN(com.valve(int(valve_number.get()),1)))
-        button3.grid(column=2, sticky='w')
+        frame4= tk.LabelFrame(self, styles, text = "Sensors")
+        frame4.place(relx=0.825, rely=0.55, relwidth=0.3, relheight=0.4, anchor = 'n')
+
+        #box 1 Valve
+        lbl_valve = tk.Label(frame1, label_styles, text = "select valve: ")
+        lbl_valve.place(relx=0.1, rely = 0.1, anchor = 'w')
+        valve_num = tk.StringVar(value=0)
+        valve_sel = tk.Spinbox(frame1, from_=0, to=len(V), width=2,  wrap=True, textvariable=valve_num)
+        valve_sel.place(relx=0.6, rely = 0.1, anchor = 'w')
+
+        bttn1 = ttk.Button(frame1, text="close",
+         command=lambda: V[int(valve_num.get())].close())
+        bttn1.place(relx = 0.48, rely = 0.2, anchor = 'e')
+        bttn2 = ttk.Button(frame1, text="open",
+         command=lambda: V[int(valve_num.get())].open())
+        bttn2.place(relx = 0.52, rely = 0.2, anchor = 'w')
+
+        #box 2 pump
+        lbl_pump = tk.Label(frame2, label_styles, text = "select pump: ")
+        lbl_pump.place(relx=0.1, rely = 0.1, anchor = 'w')
+        pump_num=tk.StringVar(value=0)
+        pump_sel = tk.Spinbox(frame2, from_=0, to=len(P), width=2, wrap=True, textvariable=pump_num)
+        pump_sel.place(relx=0.6, rely = 0.1, anchor = 'w')
+
+        lbl_pump = tk.Label(frame2, label_styles, text = "volume (ml): ")
+        lbl_pump.place(relx=0.5, rely = 0.2, anchor = 'e')
+        volume=tk.StringVar()
+        vol_entry = tk.Entry(frame2, entry_styles, textvariable=volume)
+        vol_entry.place(relx=0.5, rely = 0.2, anchor = 'w')
+        bttn1 = ttk.Button(frame2, text="send",
+         command=lambda: P[int(pump_num.get())].pump(float(volume.get())))
+        bttn1.place(relx = 0.5, rely = 0.3, anchor = 'center')
+
+        #box 3 mixer
+        lbl_mix = tk.Label(frame3, label_styles, text = "time (s): ")
+        lbl_mix.place(relx=0.5, rely = 0.1, anchor = 'e')
+        time=tk.StringVar()
+        t_entry = tk.Entry(frame3, entry_styles, textvariable= time)
+        t_entry.place(relx=0.5, rely = 0.1, anchor = 'w')
+        bttn1 = ttk.Button(frame3, text="send")
+        bttn1.place(relx = 0.5, rely = 0.35, anchor = 'center')
 
 class PageTwo(tk.Frame):
 
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self,parent, bg = frame_styles["bg"])
-        label = tk.Label(self, text = "Pump Control", font=LARGE_FONT, bg = frame_styles["bg"])
+        tk.Frame.__init__(self,parent, bg = styles["bg"])
+        label = tk.Label(self, text = "Recipe", font=LARGE_FONT, bg = styles["bg"])
         label.pack(pady=10,padx=10)
+
+        bttn1 = ttk.Button(self, text="Open Camera", command=lambda: camera())
+        bttn1.pack(pady=10,padx=10)
 
 class PageThree(tk.Frame):
 
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self,parent, bg = frame_styles["bg"])
-        label = tk.Label(self, text = "Multi-Pump Control", font=LARGE_FONT)
-        label.pack(pady=10,padx=10)
+        tk.Frame.__init__(self,parent, bg = styles["bg"])
 
+        title = tk.Label(self, text = "Iterative experiment", font=LARGE_FONT, bg = styles["bg"])
+        title.place(relx = 0.5, rely = 0.1, anchor = 'center')
 
-        MyText = "R A: Type in the number of ml"
-        T1 = tk.Text(self, height = 1, width = 52)
-        T1.insert(tk.END, MyText)
-        T1.pack()
+        frames = [0]*5
+        frames[0] = tk.LabelFrame(self, styles, text = "Settings of experiments")
+        frames[0].place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+        frames[1] = tk.LabelFrame(frames[0], styles, relief='flat', text = "volume")
+        frames[1].place(relx= 0.75, rely = 0.05, relwidth=0.25, relheight=0.6, anchor = 'ne')
+        frames[2] = tk.LabelFrame(frames[0], styles, relief='flat', text = "steps")
+        frames[2].place(relx= 0.75, rely = 0.05, relwidth=0.25, relheight=0.6, anchor = 'nw')
+        frames[3] = tk.LabelFrame(frames[0], styles, text = "Send")
+        frames[3].place(relx= 0.75, rely = 0.65, relwidth=0.4, relheight=0.3, anchor = 'n')
 
-class PageFour(tk.Frame):
+        def on_click(checkbutton_var, widgets, pos: int):
+            [lbl, ent_vol, lbls, ent_step] = widgets
+            if checkbutton_var.get() == 1:
+                place_entry_block(lbl, ent_vol, pos)
+                place_entry_block(lbls, ent_step, pos)
+            else:
+                for widget in widgets:
+                    widget.place_forget()
 
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self,parent, bg = frame_styles["bg"])
-        label = tk.Label(self, text = "Recipe", font=LARGE_FONT)
-        label.pack(pady=10,padx=10)
+            
+        lblA, ent_volA = entry_block("Liquid A:",frames[1])
+        lblsA, ent_stepA = entry_block("step A:",frames[2])
+        place_entry_block(lblA, ent_volA, 1)
+        place_entry_block(lblsA, ent_stepA, 1)
+        widgetsA = [lblA, ent_volA, lblsA, ent_stepA]
 
-        MyText = str(recipe_1)
-        T = tk.Text(self, height = 3, width = 52)
-        T.insert(tk.END, MyText)
-        T.pack()
-
-        button2 = ttk.Button(self, text="send your recipe to Ard",
-         command=lambda: buffer.IN(recipe_1))
-        button2.pack()     
-
-class PageFive(tk.Frame):
-
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self,parent, bg = frame_styles["bg"])
+        lblB, ent_volB = entry_block("Liquid B:",frames[1])
+        lblsB, ent_stepB = entry_block("step B:",frames[2])
+        widgetsB = [lblB, ent_volB, lblsB, ent_stepB]
         
-        label = tk.Label(self, text = "Iterative Sequence", font=LARGE_FONT, bg = frame_styles["bg"])
-        label.grid(row=0, column= 0, columnspan=3)
+        lblcount, e_count = entry_block("iterations:",frames[3], spin=True)
+        place_entry_block(lblcount, e_count, 1)
+        bttn1 = ttk.Button(frames[3], text="Start", command=lambda: send_command())
+        bttn1.place(relx = 0.5, rely = 0.6, anchor='center') 
 
-        def entry_block(text, pos):
-            row,col = pos
-            T = tk.Label(self, text = text, font=SMALL_FONT, bg = frame_styles["bg"])
-            entry = ttk.Entry(self, width=8)
-            T.grid(row=row, column=col, sticky='E')
-            entry.grid(row=row, column=col+1, sticky='W')
-            return entry
-
-        e_Ra_ml = entry_block("Liquid A:", [1,0])
-        e_Ra_step = entry_block("step A:",[1,2])
-
-        e_Rb_ml = entry_block("Liquid B:",[2,0])
-        e_Rb_step = entry_block("step B:",[2,2])
-        e_count = entry_block("iterations:",[3,0])
-
-        button1 = ttk.Button(self, text="Start", command=lambda: send_command())
-        button1.grid(row=4, column=2) 
+        checkbutton_var1 = tk.IntVar(value=1)
+        checkbutton= tk.Checkbutton(frames[0], text="Reactant A", variable=checkbutton_var1, command=lambda: on_click(checkbutton_var1, widgetsA, 1))
+        checkbutton.place(relx = 0.1, rely = 0.3, anchor='center') 
+        checkbutton_var2 = tk.IntVar()
+        checkbutton= tk.Checkbutton(frames[0], text="Reactant B", variable=checkbutton_var2, command=lambda: on_click(checkbutton_var2, widgetsB, 2))
+        checkbutton.place(relx = 0.1, rely = 0.4, anchor='center') 
 
         def send_command():
             cmd_list = []
-            Ra_ml_init = e_Ra_ml.get()
-            Ra_step = e_Ra_step.get()
-            Rb_ml_init = e_Rb_ml.get()
-            Rb_step = e_Rb_step.get()
+            Ra_ml_init = ent_volA.get()
+            Ra_step = ent_stepA.get()
+            Rb_ml_init = ent_volB.get()
+            Rb_step = ent_stepB.get()
             count = int(e_count.get())
 
             for i in range(count):
                 if Ra_ml_init!="" and Ra_step!="":
                     Ra_ml = float(Ra_ml_init) + float(Ra_step)*i
-                    cmd_list.append(com.pump(1, Ra_ml))
+                    cmd_list.append(P[0].pump(Ra_ml))
                 if Rb_ml_init!="" and Rb_step!="":
                     Rb_ml = float(Rb_ml_init) + float(Rb_step)*i
-                    cmd_list.append(com.pump(1, float(Rb_ml)))
+                    cmd_list.append(P[1].pump(Rb_ml))
 
             buffer.IN(cmd_list)
             return
@@ -268,62 +365,41 @@ class OpenNewWindow(tk.Tk):
         label1.pack(side="top")
 
 
-def event_handler(MESSAGES):
-    global lastmessage
-    global buffer 
+init = initialise()
+init.mainloop()
+
+def Event(MESSAGES):
     for MESSAGE in MESSAGES:
         match MESSAGE[5]:
             case "E":
                 print('REPEAT')
 
             case "V":
+                arduino[0].busy()
+                #create log function to save validated commands.
+                All_commands = buffer.READ()
+                
                 buffer.POP()
-                print("left in the buffer:", buffer.READ())
+                #print("left in the buffer:", buffer.READ())
 
             case "F":
-                if len(buffer.READ())>0:
-                    lastmessage = buffer.OUT(arduino_servo)
+                arduino[0].free()
                     
             case _:
                 pass
     
     return 
-
-
-def init_task():
-    global lastmessage
-    global messages
-    if (arduino_servo.inWaiting() > 0):
-        messages = com.SERIAL_READ_LINE(arduino_servo)
-        lastmessage = messages[len(messages)-1]
-        print("the last messge is: ", lastmessage)
-        messages=[lastmessage]
-    init.after(200, init_task)
-    time.sleep(0.01)
-#initialisation 
-#init = initialise()
-#init.after(200, init_task)
-#init.mainloop()
-
 def task():
-    global lastmessage
-    global messages
-    global buffer
+    if len(arduino):
 
-    
-    if (arduino_servo.inWaiting() > 0):
-        messages = com.SERIAL_READ_LINE(arduino_servo)
-        lastmessage = messages[len(messages)-1]
-        event_handler(messages)
-        messages=[lastmessage]
+        if (arduino[0].get_device().inWaiting() > 0):
+            messages = com.SERIAL_READ_LINE(arduino[0].get_device())
+            Event(messages)
+        
+        if arduino[0].get_state()==False and buffer.LENGTH()>0:
+            buffer.OUT() 
 
      
-    if len(messages)>0 and len(buffer.READ())>0:
-        event_handler(messages)
-        lastmessage = messages[len(messages)-1]
-        messages=[]
-    
-
     gui.after(100, task)
     time.sleep(0.01)
 #GUI
