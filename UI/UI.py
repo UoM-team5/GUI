@@ -108,25 +108,30 @@ def logging(data, n, type):
                     writer = csv.writer(csvfile) 
                     writer.writerow(final_command)
 
-# arr = ["6", "5" ,"2"]
-# for x in arr:
-#     logging(x ,arr.index(x), "R")
-
+def init_save_data(type):
+            print(init_entry_arr)
+            data = [0 for i in range(n_reactants)]
+            for x in range(n_reactants):
+                data = init_entry_arr[x].get()
+                logging(data, x, type)
               
 def init_entry_ml(frame, entry):
-    n = int(entry.get() or 0)
+    global n_reactants
+    global init_entry_arr
+    n_reactants = int(entry.get() or 0)
     
-    lb_arr = [0 for i in range(n)]
-    entry_arr = [0 for i in range(n)]
+    lb_arr = [0 for i in range(n_reactants)]
+    init_entry_arr = [0 for i in range(n_reactants)]
     pos = 0.4
 
-    for x in range(n):
+    for x in range(n_reactants):
         
         text = str("Reactant ") + str(x+1) + str(":")
-        lb_arr[x], entry_arr[x] = entry_block(text, frame)
-        init_place_entry_block(lb_arr[x], entry_arr[x], pos)
+        lb_arr[x], init_entry_arr[x] = entry_block(text, frame)
+        init_place_entry_block(lb_arr[x], init_entry_arr[x], pos)
         pos += 0.1
-    return entry_arr, n
+
+    return init_entry_arr, n_reactants
 
 
 
@@ -174,26 +179,18 @@ class initialise(tk.Tk):
         lb_ml = tk.Label(frame2, label_styles, text ="Amount in ml:", fg=styles["fg"], font=('Arial', 10, 'bold'))
         lb_ml.place(relx = 0.48, rely = 0.28, anchor = 'e')
 
+
+        bttn2 = ttk.Button(self, text="FINISH",
+         command=lambda: [init_save_data("R"), init.destroy()])
+        bttn2.place(relx = 0.5, rely = 0.94, anchor = 'center') 
+
         bttn3 = ttk.Button(frame2, text="Add", width= 6, command= lambda: init_entry_ml(frame2,entry_react))
         bttn3.place(relx = 0.87, rely = 0.15, anchor = 'center') 
 
-        entry_arr, n= init_entry_ml(frame2,entry_react) # This is empty
-    
-
-        def save_data(data, n, type):
-            for x in range(n):
-                final_data=data[x].get()
-                print (final_data)
-                logging(final_data, type, x)
-
-        bttn2 = ttk.Button(self, text="FINISH",
-         command=lambda: [init.destroy(), save_data(entry_arr, n, "R")])
-        bttn2.place(relx = 0.5, rely = 0.94, anchor = 'center') 
-
-
-        
         
         update_devices()
+
+
 
 class MenuBar(tk.Menu):
     def __init__(self, parent):
