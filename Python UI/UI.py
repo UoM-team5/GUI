@@ -11,11 +11,14 @@ import cv2
 
 buffer = com.Buffer()
 def init_module():
-    global arduino, V, P
-    arduino = []
+    global arduinos, device, V, P
+    arduinos = []
     V = [0]
     P = [0]
     Ports = com.ID_PORTS_AVAILABLE()
+    if len(Ports):
+        V = []
+        P = []
     for i in range(len(Ports)):
         print("\nSource: ", Ports[i])
         device = com.OPEN_SERIAL_PORT(Ports[i])
@@ -26,17 +29,34 @@ def init_module():
         message = com.SERIAL_READ_LINE(device)
         deviceID  = message[0][0:4]
         print("\narduino: ", deviceID)
-        arduino.append(com.Nano(device, deviceID))
+        arduinos.append(com.Nano(device, deviceID))
         if deviceID=="1001":
             V1 = com.Valve(device, deviceID, 1, buffer)
             V2 = com.Valve(device, deviceID, 2, buffer)
             V3 = com.Valve(device, deviceID, 3, buffer)
-            V = [V1,V2,V3]
+            V4 = com.Valve(device, deviceID, 4, buffer)
+            V5 = com.Valve(device, deviceID, 5, buffer)
+
             P1 = com.Pump(device, deviceID, 1, buffer)
             P2 = com.Pump(device, deviceID, 2, buffer)
-            P = [P1, P2]
-        #TO DO: Build CSV table and initialise components
+            P3 = com.Pump(device, deviceID, 3, buffer)
+        if deviceID=="1002":
+            V1 = com.Valve(device, deviceID, 1, buffer)
+            V2 = com.Valve(device, deviceID, 2, buffer)
+            V3 = com.Valve(device, deviceID, 3, buffer)
+            V4 = com.Valve(device, deviceID, 4, buffer)
+            V5 = com.Valve(device, deviceID, 5, buffer)
 
+            P1 = com.Pump(device, deviceID, 1, buffer)
+            P2 = com.Pump(device, deviceID, 2, buffer)
+            P3 = com.Pump(device, deviceID, 3, buffer)
+        
+        
+
+        #TO DO: Build CSV table and initialise components
+    # V = [V1,V2,V3,V4,V5]
+    # P = [P1, P2, P3]
+    
     print("\n------------End initialisation--------------\n\n")
     return
 
@@ -67,12 +87,11 @@ def bttn_image(frame, text, file_name):
     bttn1.image = photo
     return bttn1
 
-
-def entry_block(text: str, frame, spin=False):
+def entry_block(text: str, frame, spin=False, from_ = 0, to = 10):
     """label followed by entry widget"""
     lbl_T = tk.Label(frame, label_styles, text = text)
     if (spin):
-        entry = tk.Spinbox(frame, from_=0, to=10, width=2, wrap=True)
+        entry = tk.Spinbox(frame, from_=from_, to=to, width=2, wrap=True)
     else:
         entry = ttk.Entry(frame, width=5)
     return lbl_T, entry
@@ -105,12 +124,14 @@ class initialise(tk.Tk):
 
         title = tk.Label(main_frame, text = "Initialise", font=LARGE_FONT, bg = styles["bg"])
         title.place(relx = 0.5, rely = 0.1, anchor = 'center')
+
+
         
         def update_devices():
             init_module()
             #refer to actual object returned if none= do not update label
-            if len(arduino):
-                update_label(details, "arduino: '1001'\n2 Valve \n1 Pump")
+            if len(arduinos):
+                update_label(details, "arduino: '1001'\n5 Valve \n1 Pump")
         
         frame1 = tk.LabelFrame(main_frame, styles, text = "Setup communcation")
         frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
@@ -245,12 +266,15 @@ class PageOne(tk.Frame):
         bttn2 = ttk.Button(frame1, text="open",
          command=lambda: V[int(valve_num.get())].open())
         bttn2.place(relx = 0.52, rely = 0.2, anchor = 'w')
+        bttn3 = ttk.Button(frame1, text="mid",
+         command=lambda: V[int(valve_num.get())].mid())
+        bttn3.place(relx = 0.5, rely = 0.3, anchor = 'center')
 
         #box 2 pump
         lbl_pump = tk.Label(frame2, label_styles, text = "select pump: ")
         lbl_pump.place(relx=0.1, rely = 0.1, anchor = 'w')
         pump_num=tk.StringVar(value=0)
-        pump_sel = tk.Spinbox(frame2, from_=0, to=len(P), width=2, wrap=True, textvariable=pump_num)
+        pump_sel = tk.Spinbox(frame2, from_=0, to=len(P)-1, width=2, wrap=True, textvariable=pump_num)
         pump_sel.place(relx=0.6, rely = 0.1, anchor = 'w')
 
         lbl_pump = tk.Label(frame2, label_styles, text = "volume (ml): ")
@@ -319,7 +343,7 @@ class PageThree(tk.Frame):
         lblsB, ent_stepB = entry_block("step B:",frames[2])
         widgetsB = [lblB, ent_volB, lblsB, ent_stepB]
         
-        lblcount, e_count = entry_block("iterations:",frames[3], spin=True)
+        lblcount, e_count = entry_block("iterations:",frames[3], spin=True, from_=1)
         place_entry_block(lblcount, e_count, 1)
         bttn1 = ttk.Button(frames[3], text="Start", command=lambda: send_command())
         bttn1.place(relx = 0.5, rely = 0.6, anchor='center') 
@@ -332,7 +356,6 @@ class PageThree(tk.Frame):
         checkbutton.place(relx = 0.1, rely = 0.4, anchor='center') 
 
         def send_command():
-            cmd_list = []
             Ra_ml_init = ent_volA.get()
             Ra_step = ent_stepA.get()
             Rb_ml_init = ent_volB.get()
@@ -342,12 +365,11 @@ class PageThree(tk.Frame):
             for i in range(count):
                 if Ra_ml_init!="" and Ra_step!="":
                     Ra_ml = float(Ra_ml_init) + float(Ra_step)*i
-                    cmd_list.append(P[0].pump(Ra_ml))
+                    P[0].pump(Ra_ml)
                 if Rb_ml_init!="" and Rb_step!="":
                     Rb_ml = float(Rb_ml_init) + float(Rb_step)*i
-                    cmd_list.append(P[1].pump(Rb_ml))
+                    P[1].pump(Rb_ml)
 
-            buffer.IN(cmd_list)
             return
          
 class OpenNewWindow(tk.Tk):
@@ -376,40 +398,39 @@ init = initialise()
 init.mainloop()
 
 def Event(MESSAGES):
+    #MESSAGES can be a list or single element
     for MESSAGE in MESSAGES:
         match MESSAGE[5]:
             case "E":
-                print('REPEAT')
+                pass
 
             case "V":
-                arduino[0].busy()
-                #create log function to save validated commands.
-                All_commands = buffer.READ()
-                
+                arduinos[0].busy()
                 buffer.POP()
                 #print("left in the buffer:", buffer.READ())
 
             case "F":
-                arduino[0].free()
+                arduinos[0].free()
                     
             case _:
                 pass
-    
-    return 
+    return
+
 def task():
-    if len(arduino):
-
-        if (arduino[0].get_device().inWaiting() > 0):
-            messages = com.SERIAL_READ_LINE(arduino[0].get_device())
-            Event(messages)
+    global device
+    if len(arduinos):
         
-        if arduino[0].get_state()==False and buffer.LENGTH()>0:
+        if (arduinos[0].get_state()==False) and (buffer.LENGTH()>0):
             buffer.OUT() 
-
+            device,_ = buffer.READ()[0]
+            arduinos[0].busy()
+        
+        if (device.inWaiting() > 0):
+            Event(com.SERIAL_READ_LINE(device))
      
-    gui.after(100, task)
+    gui.after(300, task)
     time.sleep(0.01)
 #GUI
 gui = Main()
-gui.after(100,task)
+gui.after(300,task)
 gui.mainloop()

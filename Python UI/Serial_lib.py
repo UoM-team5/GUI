@@ -55,8 +55,8 @@ def SERIAL_READ_LINE(DEV):
         FLUSH_PORT(DEV) 
         return Incoming_Data
     except (NameError,IOError,ValueError):
-            pass
-    return -1
+        pass
+    return [-1]
 
 def DECODE_LINES(cmd_list):
     for i in range(0,len(cmd_list)):
@@ -67,7 +67,7 @@ def DECODE_LINES(cmd_list):
 
 def DECODE_LINE(command):
     if command[0]!="[" or command[-1]!="]":
-        return "1001 skip " + command #print("this is not valid: ", command)
+        return "skip " + command #print("this is not valid: ", command)
     cmd_strip = command[1:-1]
     cmd_split = cmd_strip.split(" ", 2)
     senderID = cmd_split[0][3:]
@@ -200,6 +200,9 @@ class Valve:
     def open(self):
         self.buffer.IN([self.device, "[sID1000 rID{} PK2 V{} S1]".format(self.ID, self.num)])
 
+    def mid(self):
+        self.buffer.IN([self.device, "[sID1000 rID{} PK2 V{} S2]".format(self.ID, self.num)])
+
     def set_state(self, state: bool):
         """Param bool state: set False->closed, True->open"""
         self.state = state
@@ -219,7 +222,7 @@ class Sensor:
     pass
 
 class Vessel: 
-    def __init__(self, component_number: int, liquid_name: str, volume: float):
+    def __init__(self, component_number: int, volume: float, liquid_name: str):
         self.num = component_number
         self.name = liquid_name
         self.vol = volume
@@ -241,11 +244,11 @@ class Vessel:
     
 #arduinos
 class Nano:
+    state = False
     def __init__(self, device, ID):
         self.device = device
         self.ID = ID
         self.components = []
-        self.state = False
         self.message = ""
 
     def get_id(self):
@@ -310,6 +313,7 @@ class Buffer:
 
     def RESET(self):
         self.buffer = []
+
 
 
 
