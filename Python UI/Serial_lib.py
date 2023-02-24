@@ -65,7 +65,7 @@ def DECODE_LINES(cmd_list):
         print(cmd_list[i])
     return cmd_list
 
-def DECODE_LINE(command):
+def DECODE_LINE(command, Comps = None):
     if command[0]!="[" or command[-1]!="]":
         return "skip " + command #print("this is not valid: ", command)
     cmd_strip = command[1:-1]
@@ -73,67 +73,111 @@ def DECODE_LINE(command):
     senderID = cmd_split[0][3:]
     receiveID = cmd_split[1]
     PK = cmd_split[2]
-    return DECODE_PACKAGE(senderID, PK)
+    return DECODE_PACKAGE(senderID, PK, Comps)
 
-def DECODE_PACKAGE(senderID, PK):
+class MyStr(str):
+
+    def __eq__(self, other):
+        return self.__contains__(other)
+
+def DECODE_PACKAGE(senderID, PK, Comps):
     n_pk = int(PK[2:4])
     pk_split = PK.split(" ", n_pk)
-    operator = pk_split[1]
+    operator = MyStr(pk_split[1])
     out = str(senderID)
-    match operator[0]:
-        case "P":
-            #[sID... rID... PK6 P1 V0 I0 M1 T1 B1 DeviceDesc]
-            return senderID, pk_split
-        case "E":
-            out += " ERROR"
-            match operator[3]:
-                case "0":
-                    return (out + " 0: Incorrect packet format")
-                case "1":
-                    return (out + " 1: Packet missing items")
-                case "2":
-                    return (out + " 2: Incorrect Device ID")
-                case "3":
-                    return (out + " 3: Incorrect Sender ID")
-                case "4":
-                    return (out + " 4: System is in error state.")
-                case _:
-                    print("Unkown Error number {}".format(operator[3]))
+    if n_pk==1:
+        # single package commands
+        match operator:
+            case "ERR":
+                print("operator ", operator)
+                out += " ERROR"
+                match operator[3]:
+                    case "0":
+                        return (out + " 0: Incorrect packet format")
+                    case "1":
+                        return (out + " 1: Packet missing items")
+                    case "2":
+                        return (out + " 2: Incorrect Device ID")
+                    case "3":
+                        return (out + " 3: Incorrect Sender ID")
+                    case "4":
+                        return (out + " 4: System is in error state.")
+                    case _:
+                        print("Unkown Error number {}".format(operator[3]))
 
-        case "A":
-            return (out + " Acknowledge")
+            case "ACK":
+                print("operator ", operator)
+                return (out + " Acknowledge")
 
-        case "B":
-            return (out + " BUSY")
+            case "BUSY":
+                print("operator ", operator)
+                return (out + " BUSY")
 
-        case "V": 
-            senderID = senderID
+            case "VALID": 
+                senderID = senderID
+                return (out + " VALID")
 
-            return (out + " VALID")
+            case "FREE":
+                return (out + " FREE")
+            
+            case _:
+                return out + " unrecognised package: " + PK
+    else:
+        #multi package commands 
+        match operator[0]:
+            case "P":
+                #Pump: [sID... rID PK3 P1 m10.2 D1]
+                num = int(pk_split[1][1])
+                vol = float(pk_split[2][1:])
+                dir = int(pk_split[3][1])
+                R = Comps.vessels[num-1]
+                R.add(float(vol))
+                print(R.get_volume())
+                print("Pump num {}, vol {}, dir {} ".format(num, vol, dir) )
+                return num, vol
+            
+            case "V":
+                #Valve: [sID... rID PK2 V1 S]
+                num = pk_split[1][1]
+                state = pk_split[2][1]
+                print("Valve num {}, state {} ".format(num, state))
+                return num,state
+            
+            case "I":
+                #Shutter: [sID... rID PK2 V1 S]
+                num = pk_split[1][1]
+                state = pk_split[2][1]
+                print("Shutter num {}, state {} ".format(num, state))
+                return num,state
+            
+            case "M":
+                #mixer
+                num = pk_split[1][1]
+                state = pk_split[2][1]
+                print("Mixer num {}, state {} ".format(num, state))
+                return num,state
+            
+            case "T":
+                out += " sensors "
+                sensor_amount = int((n_pk)/2)
+                Temp=[0.0]*5
+                bubb=[0]*5
+                for i in range(sensor_amount):
+                    sensor_type = pk_split[2*i+1][0]
+                    sensor_num = int(pk_split[2*i+1][1:])
+                    sensor_val = float(pk_split[2*i+2][1:])
+                    #print(i, sensor_type, sensor_num, sensor_val)
+                    if sensor_type == "T":
+                        Temp[sensor_num-1] = sensor_val
+                    elif sensor_type == "B":
+                        bubb[sensor_num-1] = int(sensor_val)
+                    else:
+                        print("unknown sensor")
+                return out + " Temperature: " + str(Temp) + " bubble " + str(bubb)
 
-        case "F":
-            return (out + " FREE")
-        
-        case "T":
-            out += " sensors "
-            sensor_amount = int((n_pk)/2)
-            Temp=[0.0]*5
-            bubb=[0]*5
-            for i in range(sensor_amount):
-                sensor_type = pk_split[2*i+1][0]
-                sensor_num = int(pk_split[2*i+1][1:])
-                sensor_val = float(pk_split[2*i+2][1:])
-                #print(i, sensor_type, sensor_num, sensor_val)
-                if sensor_type == "T":
-                    Temp[sensor_num-1] = sensor_val
-                elif sensor_type == "B":
-                    bubb[sensor_num-1] = int(sensor_val)
-                else:
-                    print("unknown sensor")
-            return out + " Temperature: " + str(Temp) + " bubble " + str(bubb)
-
-        case _:
-            return out + " unrecognised package: " + PK
+            case _:
+                print("operator ",operator)
+                return out + " unrecognised cmd package: " + PK
 
 def SERIAL_WRITE_LINE(DEV,COMMAND):
     try:
@@ -151,6 +195,9 @@ def WRITE(DEV,COMMAND):
         TRY = TRY + 1
         if(TRY>10):
             return -1
+    return STATE
+
+def READ(DEV):
     STATE = -1
     TRY = 0
     while(STATE == -1):
@@ -203,52 +250,83 @@ class Valve:
     def mid(self):
         self.buffer.IN([self.device, "[sID1000 rID{} PK2 V{} S2]".format(self.ID, self.num)])
 
-    def set_state(self, state: bool):
+    def set_state(self, state: int):
         """Param bool state: set False->closed, True->open"""
         self.state = state
     
     def get_state(self):
         return self.state
 
-class Mixer:
-    def __init__(self, deviceID, component_number):
-        self.deviceID = deviceID
+class Shutter:
+    def __init__(self, device, ID, component_number: int, buffer):
+        self.device = device
+        self.ID = ID
         self.num = component_number
+        self.buffer = buffer
+        self.state = 0
+         
+    def close(self):
+        self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S0]".format(self.ID, self.num)])
 
-    def mix(self, time):
-        return "[sID1000 rID{} PK2 M{} S1]".format(self.deviceID, self.num)
+    def open(self):
+        self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S1]".format(self.ID, self.num)])
+
+    def mid(self):
+        self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S2]".format(self.ID, self.num)])
+
+    def set_state(self, state: int):
+        self.state = state
+    
+    def get_state(self):
+        return self.state
+
+class Mixer:
+    def __init__(self, device, ID, component_number: int, buffer):
+        self.device = device
+        self.ID = ID
+        self.num = component_number
+        self.buffer = buffer
+
+    def mix(self, speed: int):
+        return "[sID1000 rID{} PK2 M{} S{}]".format(self.ID, self.num, speed)
 
 class Sensor:
     pass
 
 class Vessel: 
-    def __init__(self, component_number: int, volume: float, liquid_name: str):
-        self.num = component_number
-        self.name = liquid_name
+    def __init__(self, volume = 10.0, liquid_name = 'none'):
         self.vol = volume
-    
+        self.name = liquid_name
+        
     def sub(self, volume: float):
         self.vol = self.vol - volume
 
     def add(self, volume: float):
         self.vol = self.vol + volume
     
-    def get_volume(self):
-        return self.vol
-    
     def set_volume(self, volume: float):
         self.vol = volume
 
+    def get_volume(self):
+        return self.vol
+    
+    def set_name(self, name: str):
+        self.name = name
+
     def get_name(self):
         return self.name
+
+class Components:
+    pass
     
+        
 #arduinos
 class Nano:
     state = False
     def __init__(self, device, ID):
         self.device = device
         self.ID = ID
-        self.components = []
+        self.components = ""
         self.message = ""
 
     def get_id(self):
@@ -258,9 +336,12 @@ class Nano:
     def get_device(self):
         return self.device
 
-    def add_component(self, component):
-        self.components.append(component)
-
+    def add_component(self, components: str):
+        self.components = components
+    
+    def get_components(self):
+        return self.components
+        
     def toggle_state(self):
         self.state = not self.state
     
@@ -294,17 +375,17 @@ class Buffer:
 
     def OUT(self):
         if len(self.buffer):
-            device, command = self.buffer[0]
-            SERIAL_WRITE_LINE(device, command)
+            # device, command = self.buffer[0]
+            WRITE(*self.buffer[0])
 
     def POP(self):
         if len(self.buffer):
             print("POP")
-            self.buffer.pop(0)
-
+            device, command = self.buffer.pop(0)
+        return command
     def READ(self) :
-        # print("length: ", len(self.buffer))
         # print("\nBuffer Contents:\n", *[i[1] for i in self.buffer], sep = "\n")
+        # reurns 2 outputs: device, command = self.buffer
         return self.buffer
 
     def LENGTH(self):
@@ -313,7 +394,6 @@ class Buffer:
 
     def RESET(self):
         self.buffer = []
-
 
 
 
