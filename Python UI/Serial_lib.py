@@ -1,5 +1,6 @@
 import serial
 import serial.tools.list_ports
+import csv, datetime, io
 
 
 def ID_PORTS_AVAILABLE():
@@ -131,8 +132,12 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                 vol = float(pk_split[2][1:])
                 dir = int(pk_split[3][1])
                 R = Comps.vessels[num-1]
-                R.add(float(vol))
-                print(R.get_volume())
+                try: 
+                    R.add(float(vol))
+                    print(R.get_volume())
+                except:
+                    pass
+                
                 print("Pump num {}, vol {}, dir {} ".format(num, vol, dir) )
                 return num, vol
             
@@ -214,6 +219,24 @@ def FLUSH_PORT(DEV):
     except:
         pass
 
+def Loggin(data, n=1, type = "C"):
+    if type == "C":  # C refers to Command
+        nowTime = datetime.datetime.now()
+        time = nowTime.strftime("%H:%M:%S")
+        string_command = time + str(" --> ") + str(data)
+        final_command = io.StringIO(string_command)
+        print('new file')
+    
+        with open("commands.csv", mode ="a") as csvfile:
+                    writer = csv.writer(csvfile) 
+                    writer.writerow(final_command)
+
+    elif type == "R": # R refers to Reactants
+        string_name = str("Reactant ") + str(n+1) + str(": ") + str(data)
+        final_command = io.StringIO(string_name)
+        with open("init_react_ml.csv", mode ="a") as csvfile:
+                    writer = csv.writer(csvfile) 
+                    writer.writerow(final_command)
 #components
 class Pump:
     def __init__(self, device, ID, component_number: int, buffer):
@@ -319,8 +342,6 @@ class Vessel:
 class Components:
     pass
     
-        
-#arduinos
 class Nano:
     state = False
     def __init__(self, device, ID):

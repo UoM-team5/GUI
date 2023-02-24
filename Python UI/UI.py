@@ -459,6 +459,7 @@ def Event(MESSAGES):
                 arduinos[0].busy()
                 command = buffer.POP()
                 com.DECODE_LINE(command, Comps)
+                com.Loggin(command)
 
             case "F":
                 arduinos[0].free()
