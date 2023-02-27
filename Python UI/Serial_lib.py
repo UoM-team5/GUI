@@ -133,8 +133,9 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                 dir = int(pk_split[3][1])
                 R = Comps.vessels[num-1]
                 try: 
-                    R.add(float(vol))
+                    R.sub(float(vol))
                     print(R.get_volume())
+                    R = Comps.vessels[6]
                 except:
                     pass
                 
@@ -162,7 +163,7 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                 print("Mixer num {}, state {} ".format(num, state))
                 return num,state
             
-            case "T":
+            case "S":
                 out += " sensors "
                 sensor_amount = int((n_pk)/2)
                 Temp=[0.0]*5
@@ -225,7 +226,6 @@ def Loggin(data, n=1, type = "C"):
         time = nowTime.strftime("%H:%M:%S")
         string_command = time + str(" --> ") + str(data)
         final_command = io.StringIO(string_command)
-        print('new file')
     
         with open("commands.csv", mode ="a") as csvfile:
                     writer = csv.writer(csvfile) 
@@ -279,6 +279,25 @@ class Valve:
     
     def get_state(self):
         return self.state
+    
+def valve_states(Valves, out: int):
+    match out:
+        case 0: states = '02222'
+        case 1: states = '10222'
+        case 2: states = '11022'
+        case 3: states = '11102'
+        case 4: states = '11110'
+        case 5: states = '11111'
+        case _: 
+            print("error unknown valve state")
+            return
+    for idx in range(0, len(states)):
+        match int(states[idx]):
+            case 0: Valves[idx].close()
+            case 1: Valves[idx].open()
+            case 2: Valves[idx].mid()
+            case _: pass
+
 
 class Shutter:
     def __init__(self, device, ID, component_number: int, buffer):
@@ -415,7 +434,3 @@ class Buffer:
 
     def RESET(self):
         self.buffer = []
-
-
-
-
