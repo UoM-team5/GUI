@@ -4,19 +4,22 @@ from tkinter import ttk
 from PIL import ImageTk, Image
 import os
 import Serial_lib as com 
+from Serial_lib import *
 import cv2 
 import datetime
 import csv
 import io
 
+
 #init comms
 
 buffer = com.Buffer()
 def init_module():
-    global arduino, V, P
+    global arduino, V, P, R
     arduino = []
     V = [0]
     P = [0]
+    R = []
     Ports = com.ID_PORTS_AVAILABLE()
     for i in range(len(Ports)):
         print("\nSource: ", Ports[i])
@@ -44,6 +47,7 @@ def init_module():
 
 # UI styles 
 LARGE_FONT= ("Arial", 20)
+label_font = ("Consolas", 15, "normal")
 styles = {"relief": "groove",
                 "bd": 3, "bg": "#DDDDDD",
                 "fg": "#073bb3", "font": ("Arial", 12, "bold")}
@@ -76,9 +80,10 @@ def place_entry_block(lbl_T, entry, pos):
     lbl_T.place(relx = 0.6, rely = pos/6, anchor = 'e')
     entry.place(relx = 0.62, rely = pos/6, anchor = 'w')
 
-def init_place_entry_block(lbl_T, entry, pos):
-    lbl_T.place(relx = 0.3, rely = pos, anchor = 'center')
-    entry.place(relx = 0.6, rely = pos, anchor = 'center')
+def init_place_entry_block(lbl_T, entry, pos_x, pos_y):
+    label_x,entry_x = pos_x
+    lbl_T.place(relx = label_x, rely = pos_y, anchor = 'center')
+    entry.place(relx = entry_x, rely = pos_y, anchor = 'center')
 
 def camera():
     #While loop in function = everything else stops = bad
@@ -90,49 +95,107 @@ def camera():
             break
     cv2.destroyAllWindows()
 
-def logging(data, n, type):
+def logging(data, n, type = "R"):
     if type == "C":  # C refers to Command
         nowTime = datetime.datetime.now()
         time = nowTime.strftime("%H:%M:%S")
         string_command = time + str(" --> ") + str(data)
         final_command = io.StringIO(string_command)
     
-        with open("commands.csv", mode ="a") as csvfile:
+        with open("commands.csv", mode ="a", newline='') as csvfile:
                     writer = csv.writer(csvfile) 
                     writer.writerow(final_command)
 
     elif type == "R": # R refers to Reactants
-        string_name = str("Reactant ") + str(n+1) + str(": ") + str(data)
-        final_command = io.StringIO(string_name)
-        with open("init_react_ml.csv", mode ="a") as csvfile:
+        name, ml = data
+        string_react = str("Reactant ") + str(n+1) + str("-->") 
+        info =  [string_react, name, ml]
+        with open("init_react_ml.csv", mode ="a", newline='') as csvfile:
                     writer = csv.writer(csvfile) 
-                    writer.writerow(final_command)
+                    writer.writerow(info)
 
-def init_save_data(type):
-            print(init_entry_arr)
-            data = [0 for i in range(n_reactants)]
-            for x in range(n_reactants):
-                data = init_entry_arr[x].get()
-                logging(data, x, type)
+def delete_csv(file:str):
+    if (os.path.exists(file) and os.path.isfile(file)):
+        os.remove(file)
               
-def init_entry_ml(frame, entry):
-    global n_reactants
-    global init_entry_arr
+def init_entry_block(frame, entry):
+    global n_reactants, init_entry_arr_names, init_entry_arr_ml
     n_reactants = int(entry.get() or 0)
     
-    lb_arr = [0 for i in range(n_reactants)]
-    init_entry_arr = [0 for i in range(n_reactants)]
+    lb_arr_names = [0 for i in range(n_reactants)]
+    lb_arr_ml = [0 for i in range(n_reactants)]
+    init_entry_arr_names = [0 for i in range(n_reactants)]
+    init_entry_arr_ml = [0 for i in range(n_reactants)]
     pos = 0.4
 
     for x in range(n_reactants):
         
-        text = str("Reactant ") + str(x+1) + str(":")
-        lb_arr[x], init_entry_arr[x] = entry_block(text, frame)
-        init_place_entry_block(lb_arr[x], init_entry_arr[x], pos)
+        text = str(x+1) + str(": ") + str("Name")
+        text1 = str("Amount")
+        lb_arr_names[x], init_entry_arr_names[x] = entry_block(text, frame)
+        lb_arr_ml[x], init_entry_arr_ml[x] = entry_block(text1, frame)
+        
+
+        init_place_entry_block(lb_arr_names[x], init_entry_arr_names[x], [0.15, 0.35],pos)
+        init_place_entry_block(lb_arr_ml[x], init_entry_arr_ml[x], [0.6, 0.8],pos)
         pos += 0.1
 
-    return init_entry_arr, n_reactants
+def update_entry_block(frame, array):
+    n = len(array)-1
+    lb_arr_names = [0 for i in range(n)]
+    lb_arr_ml = [0 for i in range(n)]
+    entry_arr_names = [0 for i in range(n)]
+    entry_arr_ml = [0 for i in range(n)]
+    pos = 0.4
+    for x in range(n):
+        
+        text = str(x+1) + str(": ") + str("Name")
+        text1 = str("Amount")
+        lb_arr_names[x], entry_arr_names[x] = entry_block(text, frame)
+        lb_arr_ml[x], entry_arr_ml[x] = entry_block(text1, frame)
+        entry_arr_names[x].insert(0, array[x].get_name())
+        entry_arr_ml[x].insert(0, array[x].get_volume())
 
+        init_place_entry_block(lb_arr_names[x], entry_arr_names[x], [0.15, 0.35],pos)
+        init_place_entry_block(lb_arr_ml[x], entry_arr_ml[x], [0.6, 0.8],pos)
+        pos += 0.1
+    return entry_arr_names,entry_arr_ml
+
+def init_save_data():
+    for x in range(n_reactants):
+        data_names = init_entry_arr_names[x].get()
+        data_ml = init_entry_arr_ml[x].get()
+        logging([data_names, data_ml], x)
+        int_ml = int(data_ml or 0)
+        R.append(com.Vessel(x, data_names, int_ml))
+    R.append(com.Vessel(n_reactants, "main vessel", 0))
+    print (R)
+
+def update_data(entry_names, entry_amount):
+    n = len(entry_amount)
+    for x in range(n):
+        data_names = entry_names[x].get()
+        data_amount = entry_amount[x].get()
+        int_ml = int(data_amount or 0)
+        R[x].set_name(data_names)
+        R[x].set_volume(int_ml)
+        print(R[x].get_name(), "", R[x].get_volume())
+    
+
+def get_csv_data():
+    
+    with open("init_react_ml.csv", mode = 'r') as csvfile:
+        reader = csv.reader(csvfile, delimiter = ",")
+        array = list(reader)
+        n = len(array)
+        react_name = [0 for i in range(n)]
+        react_amount = [0 for i in range(n)]
+        for x in range(n):
+            react_name[x]= array[x][1]
+            react_amount[x]= array[x][2]
+            
+    return react_name, react_amount, n
+    
 
 
 # UI classes
@@ -179,18 +242,19 @@ class initialise(tk.Tk):
         lb_ml = tk.Label(frame2, label_styles, text ="Amount in ml:", fg=styles["fg"], font=('Arial', 10, 'bold'))
         lb_ml.place(relx = 0.48, rely = 0.28, anchor = 'e')
 
-
         bttn2 = ttk.Button(self, text="FINISH",
-         command=lambda: [init_save_data("R"), init.destroy()])
+         command=lambda:  init.destroy())
         bttn2.place(relx = 0.5, rely = 0.94, anchor = 'center') 
 
-        bttn3 = ttk.Button(frame2, text="Add", width= 6, command= lambda: init_entry_ml(frame2,entry_react))
+        bttn3 = ttk.Button(frame2, text="Add", width= 6, command= lambda: init_entry_block(frame2,entry_react))
         bttn3.place(relx = 0.87, rely = 0.15, anchor = 'center') 
 
-        
+        bttn4 = ttk.Button(frame2, text="Save", width= 6, command= lambda: init_save_data() )
+        bttn4.place(relx = 0.5, rely = 0.92, anchor = 'center')
+
         update_devices()
-
-
+        delete_csv('init_react_ml.csv')
+        # delete_csv('commands.csv')
 
 class MenuBar(tk.Menu):
     def __init__(self, parent):
@@ -243,6 +307,7 @@ class Main(tk.Tk):
     def Quit_application(self):
         self.destroy()
 
+
 class StartPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self,parent, bg = styles["bg"])
@@ -273,7 +338,7 @@ class StartPage(tk.Frame):
         # add_image("carap.png", frame1, relx=1, rely=1, anchor = 'se')
         # add_image("carap_flip.png", frame1, relx=0, rely=1, anchor = 'sw')
         bttn4 = ttk.Button(frame1, text="Exit",
-         command=lambda: controller.Quit_application())
+         command=lambda:controller.Quit_application() )
         bttn4.place(relx = 0.5, rely = 0.9, anchor = 'center')
 
 class PageOne(tk.Frame):
@@ -338,11 +403,25 @@ class PageTwo(tk.Frame):
 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self,parent, bg = styles["bg"])
-        label = tk.Label(self, text = "Recipe", font=LARGE_FONT, bg = styles["bg"])
+        label = tk.Label(self, text = "Details", font=LARGE_FONT, bg = styles["bg"])
         label.pack(pady=10,padx=10)
 
-        bttn1 = ttk.Button(self, text="Open Camera", command=lambda: camera())
-        bttn1.pack(pady=10,padx=10)
+        frame1 = tk.LabelFrame(self, styles, text = "Input vessels info")
+        frame1.place(relx= 0.48, rely = 0.55, relwidth=0.4, relheight=0.8, anchor = 'e')
+        frame2 = tk.LabelFrame(self, styles, text = "Reaction vessel info")
+        frame2.place(relx= 0.52, rely=0.55, relwidth=0.4, relheight=0.8, anchor = 'w')
+
+    
+        entry_names, entry_amount = update_entry_block(frame1, R)
+
+        bttn1 = ttk.Button(frame1, text="Update",
+         command=lambda: update_data(entry_names, entry_amount))
+        bttn1.place(relx = 0.5, rely = 0.94, anchor = 'center')   
+
+        label1 = tk.Label(frame2, label_styles, text = "Amount in ml:")
+        label1.place(relx = 0.38, rely = 0.5, anchor = 'center')
+        label2 = tk.Label(frame2, label_styles, text = str(R[-1].get_volume()))
+        label2.place(relx = 0.59, rely = 0.5, anchor = 'center')
 
 class PageThree(tk.Frame):
 
