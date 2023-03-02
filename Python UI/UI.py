@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-from PIL import ImageTk, Image
+from PIL import Image
 import customtkinter as ctk
 import Serial_lib as com 
 from Serial_lib import Pump, Valve, Shutter, Mixer, Sensor, Vessel, Nano 
@@ -10,21 +10,24 @@ from threading import Thread
 # UI styles 
 Title_font= ("Consolas", 30)
 label_font = ("Consolas", 15, "normal")
+btn_font = ("Arial", 13, "normal")
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("dark-blue")
 #init comms
-
+com.delete_file()
 buffer = com.Buffer()
 def init_module():
-    global arduinos, device, V, P, M, S, R, Comps
+    global arduinos, device, Comps
     Ports = com.ID_PORTS_AVAILABLE()
     arduinos = [0]*4
     V = [0]*5
     P = [0]*4
     S = 0
     M = 0
-    R = [0]*8
-    R[7] = Vessel(0, "main")
+    R_in = [0]*3
+    R_out = [0]*6
+    main = Vessel(0, "main")
+
     for i in range(len(Ports)):
         print("\nSource: ", Ports[i])
         device = com.OPEN_SERIAL_PORT(Ports[i])
@@ -39,29 +42,29 @@ def init_module():
         if deviceID=="1001":
             arduinos[0] = Nano(device, deviceID)
             arduinos[0].add_component("Pump 1")
-            R[0] = Vessel()
+            R_in[0] = Vessel()
             P[0] = Pump(device, deviceID, 1, buffer)
         if deviceID=="1002":
             arduinos[1] = Nano(device, deviceID)
             arduinos[1].add_component("Pump 2")
-            R[1] = Vessel()
+            R_in[1] = Vessel()
             P[1] = Pump(device, deviceID, 2, buffer)
         if deviceID=="1003":
             arduinos[2] = Nano(device, deviceID)
             arduinos[2].add_component("Pump 3")
-            R[2] = Vessel()
+            R_in[2] = Vessel()
             P[2] = Pump(device, deviceID, 3, buffer)
         if deviceID=="1004":
             arduinos[3] = Nano(device, deviceID)
             arduinos[3].add_component("Pump 4, V1-V5")
-            V[0] = Valve(device, deviceID, 1, buffer)
-            V[1] = Valve(device, deviceID, 2, buffer)
-            V[2] = Valve(device, deviceID, 3, buffer)
-            V[3] = Valve(device, deviceID, 4, buffer)
-            V[4] = Valve(device, deviceID, 5, buffer)
-
+            for i in range(5):
+                V[i] = Valve(device, deviceID, i+1, buffer)
+            for i in range(6):
+                R_out[i] = Vessel(0, 'Product '+str(i))
+            
             P[3] = Pump(device, deviceID, 4, buffer)
         if deviceID=="1005":
+            arduinos[4].add_component("shutter")
             M = Mixer(device, deviceID, 1, buffer)
             S = Shutter(device, deviceID, 1, buffer)
     
@@ -70,7 +73,9 @@ def init_module():
         except:pass
     print("\n------------End initialisation--------------\n\n")
     Comps = com.Components()
-    Comps.vessels = R
+    Comps.ves_in = R_in
+    Comps.ves_out = R_out
+    Comps.main = main
     Comps.valves = V
     Comps.pumps = P
     Comps.mixer = M
@@ -89,13 +94,14 @@ def add_image(frame, file_name, relx, rely, size = (200,40), anchor='center'):
     label.image = photo
     label.place(relx = relx, rely = rely, anchor = anchor)
 
-def btn(frame, text: str, command=None):
+def btn(frame, text: str, command=None, width=50, height=20, font=btn_font):
     btn = ctk.CTkButton(frame, 
                         text=text,
+                        font=font,
                         border_width=0,
                         border_color='black',
                         corner_radius=5, 
-                        width=50, height=20, 
+                        width=width, height=height, 
                         compound = 'left',
                         command = command)
     return btn
@@ -138,9 +144,9 @@ def entry_block(frame, text: str, spin=False, from_ = 0, to = 10, drop_list=None
 
     return lbl, entry
 
-def place_2(rely, lbl, entry):
-    lbl.place(relx = 0.45, rely = rely, anchor = 'e')
-    entry.place(relx = 0.5, rely = rely, anchor = 'w')
+def place_2(rely, lbl, entry, relx = 0.5):
+    lbl.place(relx = relx-0.05, rely = rely, anchor = 'e')
+    entry.place(relx = relx, rely = rely, anchor = 'w')
     return lbl, entry
 
 # UI classes
@@ -186,11 +192,11 @@ class Frame(ctk.CTkFrame):
 class initialise(ctk.CTk):
     def __init__(self, *args, **kwargs):
         ctk.CTk.__init__(self, *args, **kwargs)
-
         main_frame = ctk.CTkFrame(self)  # this is the background
         main_frame.pack(fill="both", expand="true")
 
-        self.geometry("600x400")  # 600w x 400h pixels
+        self.geometry("900x600")
+        self.minsize(700,500)
         #self.resizable(0, 0)  # This prevents any resizing of the screen
         self.title("Initialisation")
 
@@ -208,18 +214,35 @@ class initialise(ctk.CTk):
                 update_label(details, text)
         
         frame1 = Frame(main_frame, text = "Setup communcation")
-        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.9, relheight=0.8, anchor = 'center')
         
+        frame2 = Frame(frame1, text = "vessel details")
+        frame2.place(relx= 0.97, rely = 0.03, relwidth=0.4, relheight=0.5, anchor = 'ne')
+
         btn1 = btn(frame1, text="Initialise", command=lambda: update_devices())
-        btn1.place(relx = 0.5, rely = 0.2, anchor = 'center') 
+        btn1.place(relx = 0.3, rely = 0.2, anchor = 'center') 
 
         ard_detail = "no arduino"
         details = ctk.CTkLabel(frame1, font=label_font, text=ard_detail,justify= 'left')
-        details.place(relx = 0.5, rely = 0.5, anchor = 'center') 
+        details.place(relx = 0.3, rely = 0.5, anchor = 'center') 
 
-        btn2 = btn(frame1, text="FINISH", command=lambda: init.destroy())
+        btn2 = btn(frame1, text="FINISH", command=lambda: init.destroy(), width = 80, height=30, font = label_font)
         btn2.place(relx = 0.5, rely = 0.9, anchor = 'center') 
-        
+        n = 3
+        ent_Rname = [0]*n
+        ent_Rvol = [0]*n
+        names, volumes =  com.read_detail()
+        for i in range(n):
+            _, ent_Rname[i] = place_2(0.2 + 0.2*i, *entry_block(frame2, text=(str(i+1) + ': Name ')), relx = 0.25)
+            _, ent_Rvol[i]  = place_2(0.2 + 0.2*i, *entry_block(frame2, text=(' Vol: ')), relx = 0.75)
+           
+            ent_Rname[i].insert(0,names[i])
+            ent_Rvol[i].insert(0,volumes[i])
+
+    
+        btn1 = btn(frame2, text ='save', command=lambda: com.vessel_detail(ent_Rname, ent_Rvol))
+        btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
+
         update_devices()
 
 class MenuBar(tk.Menu):
@@ -251,8 +274,8 @@ class Main(ctk.CTk):
         ctk.CTk.__init__(self, *args, **kwargs)
         ctk.CTk.wm_title(self, "ARCaDIUS")
 
-        self.geometry("700x431") 
-        self.minsize(500,300) 
+        self.geometry("900x500") 
+        self.minsize(700,400) 
         container = ctk.CTkFrame(self, height=600, width=1024)
         container.pack(side="top", fill = "both", expand = "true")
         container.grid_rowconfigure(0, weight= 1)
@@ -338,6 +361,8 @@ class P_Test(ctk.CTkFrame):
         
         frame1 = Frame(self, text = "Valve")
         frame1.place(relx=0.175, rely=0.15, relwidth=0.3, relheight=0.8, anchor = 'n')
+        frame12 = Frame(frame1, text = "shutter", fg_color = 'transparent')
+        frame12.place(relx=0, rely=1, relwidth=1, relheight=0.5, anchor = 'sw')
 
         frame2 = Frame(self, text = "Pump")
         frame2.place(relx=0.5, rely=0.15, relwidth=0.3, relheight=0.8, anchor = 'n')
@@ -349,20 +374,29 @@ class P_Test(ctk.CTkFrame):
         frame4.place(relx=0.825, rely=0.55, relwidth=0.3, relheight=0.4, anchor = 'n')
 
         #box 1 Valve
-        _, ent_valve = place_2(0.2, *entry_block(frame1, "select valve: ", spin=True, from_=1, to=len(V)))
+        _, ent_valve = place_2(0.2, *entry_block(frame1, "select valve: ", spin=True, from_=1, to=len(Comps.valves)))
 
-        btn1 = btn(frame1, text="close", command=lambda: V[int(ent_valve.get())-1].close())
+        btn1 = btn(frame1, text="close", command=lambda: Comps.valves[int(ent_valve.get())-1].close())
         btn1.place(relx = 0.48, rely = 0.3, anchor = 'e')
-        btn2 = btn(frame1, text="open", command=lambda: V[int(ent_valve.get())-1].open())
+        btn2 = btn(frame1, text="open", command=lambda: Comps.valves[int(ent_valve.get())-1].open())
         btn2.place(relx = 0.52, rely = 0.3, anchor = 'w')
-        btn3 = btn(frame1, text="mid", command=lambda: V[int(ent_valve.get())-1].mid())
+        btn3 = btn(frame1, text="mid", command=lambda: Comps.valves[int(ent_valve.get())-1].mid())
         btn3.place(relx = 0.5, rely = 0.4, anchor = 'center')
 
+        #box 1.2 Shutter
+        
+        btn1 = btn(frame12, text="close", command=lambda: Comps.shutter.close())
+        btn1.place(relx = 0.48, rely = 0.3, anchor = 'e')
+        btn2 = btn(frame12, text="open", command=lambda: Comps.shutter.open())
+        btn2.place(relx = 0.52, rely = 0.3, anchor = 'w')
+        btn3 = btn(frame12, text="mid", command=lambda: Comps.shutter.mid())
+        btn3.place(relx = 0.5, rely = 0.5, anchor = 'center')
+
         #box 2 pump
-        _, ent_pump = place_2(0.2,*entry_block(frame2, "select pump: ", spin=True, from_=1, to=len(P)))
+        _, ent_pump = place_2(0.2,*entry_block(frame2, "select pump: ", spin=True, from_=1, to=len(Comps.pumps)))
         _, ent_vol = place_2(0.3, *entry_block(frame2, "Volume (ml)"))
 
-        btn1 = btn(frame2, text="send", command=lambda: P[int(ent_pump.get())-1].pump(float(ent_vol.get())))
+        btn1 = btn(frame2, text="send", command=lambda: Comps.pumps[int(ent_pump.get())-1].pump(float(ent_vol.get())))
         btn1.place(relx = 0.5, rely = 0.4, anchor = 'center')
 
         #box 3 mixer
@@ -401,18 +435,18 @@ class P_Auto(ctk.CTkFrame):
                 try:
                     vol=float(ent_P[i].get())
                     tot_vol+=vol
-                    P[i].pump(vol)
+                    Comps.pumps[i].pump(vol)
                 except:pass
             try:
-                M.mix(5)
-                S.open()
-                S.close()
-                M.mix(0)
+                Comps.mixer.mix(5)
+                Comps.shutter.open()
+                Comps.shutter.close()
+                Comps.mixer.mix(0)
             except:pass
 
             try:
-                com.valve_states(V, out_list.index(sel_output.get()))
-                P[3].pump(tot_vol)
+                com.valve_states(Comps.valves, out_list.index(sel_output.get()))
+                Comps.pumps[3].pump(tot_vol)
             except:pass
 
 class P_Iter(ctk.CTkFrame):
@@ -474,10 +508,10 @@ class P_Iter(ctk.CTkFrame):
             for i in range(count):
                 if Ra_ml_init!="" and Ra_step!="":
                     Ra_ml = float(Ra_ml_init) + float(Ra_step)*i
-                    P[0].pump(Ra_ml)
+                    Comps.pumps[0].pump(Ra_ml)
                 if Rb_ml_init!="" and Rb_step!="":
                     Rb_ml = float(Rb_ml_init) + float(Rb_step)*i
-                    P[1].pump(Rb_ml)
+                    Comps.pumps[1].pump(Rb_ml)
 
             return
 
@@ -531,6 +565,7 @@ def Event(MESSAGES):
                 arduinos[0].busy()
                 command = buffer.POP()
                 com.DECODE_LINE(command, Comps)
+                com.Log(command)
 
             case "F":
                 arduinos[0].free()
@@ -543,7 +578,7 @@ def task():
     global device
     if len(arduinos):
         
-        if (arduinos[0].get_state()==False) and (buffer.LENGTH()>0):
+        if (arduinos[0].state==False) and (buffer.LENGTH()>0):
             buffer.OUT() 
             device,_ = buffer.READ()[0]
             arduinos[0].busy()
@@ -560,10 +595,10 @@ def cam():
                 video_stream.show_frame()
         except:
             pass
-    gui.after(200, cam)
+    gui.after(50, cam)
     time.sleep(0.01)
 #GUI
 gui = Main()
 gui.after(100,task)
-gui.after(200,cam)
+gui.after(50,cam)
 gui.mainloop()

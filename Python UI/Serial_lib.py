@@ -1,6 +1,6 @@
 import serial
 import serial.tools.list_ports
-import csv, datetime, io
+import csv, datetime, os
 
 
 def ID_PORTS_AVAILABLE():
@@ -131,14 +131,18 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                 num = int(pk_split[1][1])
                 vol = float(pk_split[2][1:])
                 dir = int(pk_split[3][1])
-                R = Comps.vessels[num-1]
-                try: 
-                    R.sub(float(vol))
-                    print(R.get_volume())
-                    R = Comps.vessels[6]
-                except:
-                    pass
-                
+                if num==(1 or 2 or 3):
+                    try: 
+                        Comps.ves_in[num-1].sub(float(vol))
+                        Comps.main.add(float(vol))
+                    except:
+                        pass
+                if num==4:
+                    try: 
+                        Comps.main.sub(float(vol))
+                        Comps.ves_out[Comps.valves.output_vessel].add(float(vol))
+                    except:
+                        pass
                 print("Pump num {}, vol {}, dir {} ".format(num, vol, dir) )
                 return num, vol
             
@@ -220,23 +224,54 @@ def FLUSH_PORT(DEV):
     except:
         pass
 
-def Loggin(data, n=1, type = "C"):
-    if type == "C":  # C refers to Command
-        nowTime = datetime.datetime.now()
-        time = nowTime.strftime("%H:%M:%S")
-        string_command = time + str(" --> ") + str(data)
-        final_command = io.StringIO(string_command)
-    
-        with open("commands.csv", mode ="a") as csvfile:
-                    writer = csv.writer(csvfile) 
-                    writer.writerow(final_command)
+def Log(command, file_name = "commands.csv"):
+    nowTime = datetime.datetime.now()
+    time = nowTime.strftime("%H:%M:%S")
 
-    elif type == "R": # R refers to Reactants
-        string_name = str("Reactant ") + str(n+1) + str(": ") + str(data)
-        final_command = io.StringIO(string_name)
-        with open("init_react_ml.csv", mode ="a") as csvfile:
-                    writer = csv.writer(csvfile) 
-                    writer.writerow(final_command)
+    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), file_name), mode ="a", newline='') as csvfile:
+        writer = csv.writer(csvfile) 
+        writer.writerow([time, command])
+
+def delete_file(file_name = "commands.csv"):
+    try:os.remove(os.path.join(os.path.dirname(os.path.realpath(__file__)), file_name))
+    except:pass
+
+def save_detail(names: list, volumes: list, file_name = "details.csv"):
+    try:os.remove(os.path.join(os.path.dirname(os.path.realpath(__file__)), file_name))
+    except:pass
+
+    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), file_name), mode ="a", newline='') as csvfile:
+        for i in range(len(names)):
+            writer = csv.writer(csvfile) 
+            writer.writerow([names[i], volumes[i]])
+
+def vessel_detail(ent_Rn, ent_Rv):
+    names=[]
+    volumes=[]
+    for i in range(len(ent_Rn)):
+        try:
+            names.append(ent_Rn[i].get())
+            volumes.append(ent_Rv[i].get())
+        except:pass
+    save_detail(names, volumes)
+    return
+
+def read_detail():
+    try:
+        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "details.csv"), mode = 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter = ",")
+            array = list(reader)
+            n = len(array)
+            names = [0 for i in range(n)]
+            volumes = [0 for i in range(n)]
+            for x in range(n):
+                names[x]= array[x][0]
+                volumes[x]= array[x][1]
+        return names, volumes
+    except:
+        return ['']*3,['']*3
+    
+
 #components
 class Pump:
     def __init__(self, device, ID, component_number: int, buffer):
@@ -257,6 +292,7 @@ class Pump:
         return self.state
 
 class Valve:
+    output_vessel = 0
     def __init__(self, device, ID, component_number: int, buffer):
         self.device = device
         self.ID = ID
@@ -281,6 +317,7 @@ class Valve:
         return self.state
     
 def valve_states(Valves, out: int):
+    Valves[0].output_vessel = out
     match out:
         case 0: states = '02222'
         case 1: states = '10222'
@@ -297,7 +334,6 @@ def valve_states(Valves, out: int):
             case 1: Valves[idx].open()
             case 2: Valves[idx].mid()
             case _: pass
-
 
 class Shutter:
     def __init__(self, device, ID, component_number: int, buffer):
@@ -390,10 +426,6 @@ class Nano:
 
     def busy(self):
         self.state = True
-
-    def get_state(self):
-        # print("Device " + str(self.get_id) + "is " + str(self.state))
-        return self.state
     
     def add_message(self, message):
         self.message = message
