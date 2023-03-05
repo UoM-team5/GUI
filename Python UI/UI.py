@@ -15,73 +15,6 @@ ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("dark-blue")
 #init comms
 com.delete_file()
-buffer = com.Buffer()
-def init_module():
-    global arduinos, device, Comps
-    Ports = com.ID_PORTS_AVAILABLE()
-    arduinos = [0]*4
-    V = [0]*5
-    P = [0]*4
-    S = 0
-    M = 0
-    R_in = [0]*3
-    R_out = [0]*6
-    main = Vessel(0, "main")
-
-    for i in range(len(Ports)):
-        print("\nSource: ", Ports[i])
-        device = com.OPEN_SERIAL_PORT(Ports[i])
-        print("\nDevice: ", device)
-        while(device.inWaiting() == 0):
-            time.sleep(0.1)
-
-        message = com.READ(device)
-        deviceID  = message[0][0:4]
-        print("\narduino: ", deviceID)
-        
-        if deviceID=="1001":
-            arduinos[0] = Nano(device, deviceID)
-            arduinos[0].add_component("Pump 1")
-            R_in[0] = Vessel()
-            P[0] = Pump(device, deviceID, 1, buffer)
-        if deviceID=="1002":
-            arduinos[1] = Nano(device, deviceID)
-            arduinos[1].add_component("Pump 2")
-            R_in[1] = Vessel()
-            P[1] = Pump(device, deviceID, 2, buffer)
-        if deviceID=="1003":
-            arduinos[2] = Nano(device, deviceID)
-            arduinos[2].add_component("Pump 3")
-            R_in[2] = Vessel()
-            P[2] = Pump(device, deviceID, 3, buffer)
-        if deviceID=="1004":
-            arduinos[3] = Nano(device, deviceID)
-            arduinos[3].add_component("Pump 4, V1-V5")
-            for i in range(5):
-                V[i] = Valve(device, deviceID, i+1, buffer)
-            for i in range(6):
-                R_out[i] = Vessel(0, 'Product '+str(i))
-            
-            P[3] = Pump(device, deviceID, 4, buffer)
-        if deviceID=="1005":
-            arduinos[4].add_component("shutter")
-            M = Mixer(device, deviceID, 1, buffer)
-            S = Shutter(device, deviceID, 1, buffer)
-    
-    for i in range(len(arduinos)):
-        try:arduinos.remove(0)
-        except:pass
-    print("\n------------End initialisation--------------\n\n")
-    Comps = com.Components()
-    Comps.ves_in = R_in
-    Comps.ves_out = R_out
-    Comps.main = main
-    Comps.valves = V
-    Comps.pumps = P
-    Comps.mixer = M
-    Comps.shutter = S
-
-    return
 
 # UI functions
 def update_label(label, new_text):
@@ -148,6 +81,77 @@ def place_2(rely, lbl, entry, relx = 0.5):
     lbl.place(relx = relx-0.05, rely = rely, anchor = 'e')
     entry.place(relx = relx, rely = rely, anchor = 'w')
     return lbl, entry
+
+buffer = com.Buffer()
+def init_module():
+    global arduinos, device, Comps
+    Ports = com.ID_PORTS_AVAILABLE()
+    arduinos = [0]*5
+    V = [0]*5
+    P = [0]*4
+    S = 0
+    M = 0
+    R_in = [0]*3
+    R_out = [0]*6
+    main = Vessel(0, "main")
+
+    for i in range(len(Ports)):
+        print("\nSource: ", Ports[i])
+        device = com.OPEN_SERIAL_PORT(Ports[i])
+        print("\nDevice: ", device)
+        while(device.inWaiting() == 0):
+            time.sleep(0.1)
+
+        message = com.READ(device)
+        deviceID  = message[0][0:4]
+        if deviceID=='skip':
+            deviceID=message[1][0:4]
+        print("\narduino: ", deviceID)
+        
+        if deviceID=="1001":
+            arduinos[0] = Nano(device, deviceID)
+            arduinos[0].add_component("Pump 1")
+            R_in[0] = Vessel()
+            P[0] = Pump(device, deviceID, 1, buffer)
+        if deviceID=="1002":
+            arduinos[1] = Nano(device, deviceID)
+            arduinos[1].add_component("Pump 2")
+            R_in[1] = Vessel()
+            P[1] = Pump(device, deviceID, 2, buffer)
+        if deviceID=="1003":
+            arduinos[2] = Nano(device, deviceID)
+            arduinos[2].add_component("Pump 3")
+            R_in[2] = Vessel()
+            P[2] = Pump(device, deviceID, 3, buffer)
+        if deviceID=="1004":
+            arduinos[3] = Nano(device, deviceID)
+            arduinos[3].add_component("Pump 4, V1-V5")
+            for i in range(5):
+                V[i] = Valve(device, deviceID, i+1, buffer)
+            for i in range(6):
+                R_out[i] = Vessel(0, 'Product '+str(i))
+            
+            P[3] = Pump(device, deviceID, 4, buffer)
+        if deviceID=="1005":
+            arduinos[4] = Nano(device, deviceID)
+            arduinos[4].add_component("shutter")
+            M = Mixer(device, deviceID, 1, buffer)
+            S = Shutter(device, deviceID, 1, buffer)
+    
+    for i in range(len(arduinos)):
+        try:arduinos.remove(0)
+        except:pass
+    print("\n------------End initialisation--------------\n\n")
+    Comps = com.Components()
+    Comps.ves_in = R_in
+    Comps.ves_out = R_out
+    Comps.main = main
+    Comps.valves = V
+    Comps.pumps = P
+    Comps.mixer = M
+    Comps.shutter = S
+
+    return
 
 # UI classes
 class VideoStream(object):
@@ -582,10 +586,10 @@ def task():
             buffer.OUT() 
             device,_ = buffer.READ()[0]
             arduinos[0].busy()
-        
-        if (device.inWaiting() > 0):
-            Event(com.READ(device))
-    
+        try:
+            if (device.inWaiting() > 0):
+                Event(com.READ(device))
+        except:pass
     gui.after(100, task)
     time.sleep(0.01)
 def cam():

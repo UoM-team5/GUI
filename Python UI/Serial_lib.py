@@ -68,7 +68,7 @@ def DECODE_LINES(cmd_list):
 
 def DECODE_LINE(command, Comps = None):
     if command[0]!="[" or command[-1]!="]":
-        return "skip " + command #print("this is not valid: ", command)
+        return "- " + command 
     cmd_strip = command[1:-1]
     cmd_split = cmd_strip.split(" ", 2)
     senderID = cmd_split[0][3:]
@@ -77,7 +77,6 @@ def DECODE_LINE(command, Comps = None):
     return DECODE_PACKAGE(senderID, PK, Comps)
 
 class MyStr(str):
-
     def __eq__(self, other):
         return self.__contains__(other)
 
@@ -90,7 +89,6 @@ def DECODE_PACKAGE(senderID, PK, Comps):
         # single package commands
         match operator:
             case "ERR":
-                print("operator ", operator)
                 out += " ERROR"
                 match operator[3]:
                     case "0":
@@ -107,11 +105,9 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                         print("Unkown Error number {}".format(operator[3]))
 
             case "ACK":
-                print("operator ", operator)
                 return (out + " Acknowledge")
 
             case "BUSY":
-                print("operator ", operator)
                 return (out + " BUSY")
 
             case "VALID": 
