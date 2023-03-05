@@ -1,26 +1,100 @@
-import time
 import tkinter as tk
 from tkinter import ttk
-from PIL import ImageTk, Image
-import os
+from PIL import Image
+import customtkinter as ctk
 import Serial_lib as com 
-from Serial_lib import *
-import cv2 
-import datetime
-import csv
-import io
+from Serial_lib import Pump, Valve, Shutter, Mixer, Sensor, Vessel, Nano 
+import os, cv2, time
+from threading import Thread
 
-
+# UI styles 
+Title_font= ("Consolas", 30)
+label_font = ("Consolas", 15, "normal")
+btn_font = ("Arial", 13, "normal")
+ctk.set_appearance_mode("light")
+ctk.set_default_color_theme("dark-blue")
 #init comms
+com.delete_file()
+
+# UI functions
+def update_label(label, new_text):
+    label.configure(text = new_text)
+    return label
+
+def add_image(frame, file_name, relx, rely, size = (200,40), anchor='center'):
+    photo = ctk.CTkImage(Image.open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'images\\', file_name), "r"), size=size)
+    label = ctk.CTkLabel(frame, image = photo, text="")
+    label.image = photo
+    label.place(relx = relx, rely = rely, anchor = anchor)
+
+def btn(frame, text: str, command=None, width=50, height=20, font=btn_font):
+    btn = ctk.CTkButton(frame, 
+                        text=text,
+                        font=font,
+                        border_width=0,
+                        border_color='black',
+                        corner_radius=5, 
+                        width=width, height=height, 
+                        compound = 'left',
+                        command = command)
+    return btn
+
+def btn_img(frame, text: str,  file_name: str, command=None, Xresize = 30, Yresize = 30):
+    try:
+        photo = ctk.CTkImage(Image.open(os.path.join(os.path.dirname(os.path.realpath(__file__)),'images\\', file_name), "r"), size = (Xresize,Yresize))
+    except:
+        photo=None
+    btn = ctk.CTkButton(frame, 
+                        text=text, 
+                        image = photo,
+                        #fg_color='darkgrey',
+                        #hover_color='darkblue', 
+                        #border_width=1,
+                        #border_color='black',
+                        corner_radius=10, 
+                        width=150, height=40,
+                        command = command,
+                        compound = 'left')
+    btn.image = photo
+    return btn
+
+def entry_block(frame, text: str, spin=False, from_ = 0, to = 10, drop_list=None):
+    """label followed by entry widget"""
+    lbl = ctk.CTkLabel(frame, text = text)
+    if (spin):
+        entry = ttk.Spinbox(frame, from_=from_, to=to, width=2, wrap=True)
+        entry.set(from_)
+    elif (type(drop_list) == list):
+        entry = ctk.CTkOptionMenu(frame,
+                        values=drop_list,
+                        width= 100)
+    else:
+        entry = ctk.CTkEntry(frame,
+                            width=50,
+                            height=25,
+                            border_width=0,
+                            corner_radius=2)
+
+    return lbl, entry
+
+def place_2(rely, lbl, entry, relx = 0.5):
+    lbl.place(relx = relx-0.05, rely = rely, anchor = 'e')
+    entry.place(relx = relx, rely = rely, anchor = 'w')
+    return lbl, entry
 
 buffer = com.Buffer()
 def init_module():
-    global arduino, V, P, R
-    arduino = []
-    V = [0]
-    P = [0]
-    R = []
+    global arduinos, device, Comps
     Ports = com.ID_PORTS_AVAILABLE()
+    arduinos = [0]*5
+    V = [0]*5
+    P = [0]*4
+    S = 0
+    M = 0
+    R_in = [0]*3
+    R_out = [0]*6
+    main = Vessel(0, "main")
+
     for i in range(len(Ports)):
         print("\nSource: ", Ports[i])
         device = com.OPEN_SERIAL_PORT(Ports[i])
@@ -28,453 +102,410 @@ def init_module():
         while(device.inWaiting() == 0):
             time.sleep(0.1)
 
-        message = com.SERIAL_READ_LINE(device)
+        message = com.READ(device)
         deviceID  = message[0][0:4]
+        if deviceID=='skip':
+            deviceID=message[1][0:4]
         print("\narduino: ", deviceID)
-        arduino.append(com.Nano(device, deviceID))
+        
         if deviceID=="1001":
-            V1 = com.Valve(device, deviceID, 1, buffer)
-            V2 = com.Valve(device, deviceID, 2, buffer)
-            V3 = com.Valve(device, deviceID, 3, buffer)
-            V = [V1,V2,V3]
-            P1 = com.Pump(device, deviceID, 1, buffer)
-            P2 = com.Pump(device, deviceID, 2, buffer)
-            P = [P1, P2]
-        #TO DO: Build CSV table and initialise components
-
+            arduinos[0] = Nano(device, deviceID)
+            arduinos[0].add_component("Pump 1")
+            R_in[0] = Vessel()
+            P[0] = Pump(device, deviceID, 1, buffer)
+        if deviceID=="1002":
+            arduinos[1] = Nano(device, deviceID)
+            arduinos[1].add_component("Pump 2")
+            R_in[1] = Vessel()
+            P[1] = Pump(device, deviceID, 2, buffer)
+        if deviceID=="1003":
+            arduinos[2] = Nano(device, deviceID)
+            arduinos[2].add_component("Pump 3")
+            R_in[2] = Vessel()
+            P[2] = Pump(device, deviceID, 3, buffer)
+        if deviceID=="1004":
+            arduinos[3] = Nano(device, deviceID)
+            arduinos[3].add_component("Pump 4, V1-V5")
+            for i in range(5):
+                V[i] = Valve(device, deviceID, i+1, buffer)
+            for i in range(6):
+                R_out[i] = Vessel(0, 'Product '+str(i))
+            
+            P[3] = Pump(device, deviceID, 4, buffer)
+        if deviceID=="1005":
+            arduinos[4] = Nano(device, deviceID)
+            arduinos[4].add_component("shutter")
+            M = Mixer(device, deviceID, 1, buffer)
+            S = Shutter(device, deviceID, 1, buffer)
+    
+    for i in range(len(arduinos)):
+        try:arduinos.remove(0)
+        except:pass
     print("\n------------End initialisation--------------\n\n")
+    Comps = com.Components()
+    Comps.ves_in = R_in
+    Comps.ves_out = R_out
+    Comps.main = main
+    Comps.valves = V
+    Comps.pumps = P
+    Comps.mixer = M
+    Comps.shutter = S
+
     return
 
-# UI styles 
-LARGE_FONT= ("Arial", 20)
-label_font = ("Consolas", 15, "normal")
-styles = {"relief": "groove",
-                "bd": 3, "bg": "#DDDDDD",
-                "fg": "#073bb3", "font": ("Arial", 12, "bold")}
-entry_styles = {"relief": "groove", "width": 8,
-                "bd": 5, "font": ("Arial", 10, "normal")}
-label_styles = {"relief": "flat", "bg": "#DDDDDD",
-                "bd": 3, "font": ("Verdana", 10, "normal")}
-
-# UI functions
-def update_label(label, new_text):
-    label.configure(text = new_text)
-    return label
-
-def add_image(file_name, frame, relx, rely, anchor='center'):
-    carap = ImageTk.PhotoImage(Image.open(os.path.join(os.path.dirname(os.path.realpath(__file__)), file_name), "r"))
-    label = tk.Label(frame, image = carap)
-    label.image = carap
-    label.place(relx = relx, rely = rely, anchor = anchor)
-
-def entry_block(text: str, frame, spin=False):
-    """label followed by entry widget"""
-    lbl_T = tk.Label(frame, label_styles, text = text)
-    if (spin):
-        entry = tk.Spinbox(frame, from_=0, to=10, width=2, wrap=True)
-    else:
-        entry = ttk.Entry(frame, width=5)
-    return lbl_T, entry
-
-def place_entry_block(lbl_T, entry, pos):
-    lbl_T.place(relx = 0.6, rely = pos/6, anchor = 'e')
-    entry.place(relx = 0.62, rely = pos/6, anchor = 'w')
-
-def init_place_entry_block(lbl_T, entry, pos_x, pos_y):
-    label_x,entry_x = pos_x
-    lbl_T.place(relx = label_x, rely = pos_y, anchor = 'center')
-    entry.place(relx = entry_x, rely = pos_y, anchor = 'center')
-
-def camera():
-    #While loop in function = everything else stops = bad
-    c = cv2.VideoCapture(0)
-    while(1):
-        _,f = c.read()
-        cv2.imshow('e2',f)
-        if cv2.waitKey(5)==27:
-            break
-    cv2.destroyAllWindows()
-
-def logging(data, n, type = "R"):
-    if type == "C":  # C refers to Command
-        nowTime = datetime.datetime.now()
-        time = nowTime.strftime("%H:%M:%S")
-        string_command = time + str(" --> ") + str(data)
-        final_command = io.StringIO(string_command)
-    
-        with open("commands.csv", mode ="a", newline='') as csvfile:
-                    writer = csv.writer(csvfile) 
-                    writer.writerow(final_command)
-
-    elif type == "R": # R refers to Reactants
-        name, ml = data
-        string_react = str("Reactant ") + str(n+1) + str("-->") 
-        info =  [string_react, name, ml]
-        with open("init_react_ml.csv", mode ="a", newline='') as csvfile:
-                    writer = csv.writer(csvfile) 
-                    writer.writerow(info)
-
-def delete_csv(file:str):
-    if (os.path.exists(file) and os.path.isfile(file)):
-        os.remove(file)
-              
-def init_entry_block(frame, entry):
-    global n_reactants, init_entry_arr_names, init_entry_arr_ml
-    n_reactants = int(entry.get() or 0)
-    
-    lb_arr_names = [0 for i in range(n_reactants)]
-    lb_arr_ml = [0 for i in range(n_reactants)]
-    init_entry_arr_names = [0 for i in range(n_reactants)]
-    init_entry_arr_ml = [0 for i in range(n_reactants)]
-    pos = 0.4
-
-    for x in range(n_reactants):
-        
-        text = str(x+1) + str(": ") + str("Name")
-        text1 = str("Amount")
-        lb_arr_names[x], init_entry_arr_names[x] = entry_block(text, frame)
-        lb_arr_ml[x], init_entry_arr_ml[x] = entry_block(text1, frame)
-        
-
-        init_place_entry_block(lb_arr_names[x], init_entry_arr_names[x], [0.15, 0.35],pos)
-        init_place_entry_block(lb_arr_ml[x], init_entry_arr_ml[x], [0.6, 0.8],pos)
-        pos += 0.1
-
-def update_entry_block(frame, array):
-    n = len(array)-1
-    lb_arr_names = [0 for i in range(n)]
-    lb_arr_ml = [0 for i in range(n)]
-    entry_arr_names = [0 for i in range(n)]
-    entry_arr_ml = [0 for i in range(n)]
-    pos = 0.4
-    for x in range(n):
-        
-        text = str(x+1) + str(": ") + str("Name")
-        text1 = str("Amount")
-        lb_arr_names[x], entry_arr_names[x] = entry_block(text, frame)
-        lb_arr_ml[x], entry_arr_ml[x] = entry_block(text1, frame)
-        entry_arr_names[x].insert(0, array[x].get_name())
-        entry_arr_ml[x].insert(0, array[x].get_volume())
-
-        init_place_entry_block(lb_arr_names[x], entry_arr_names[x], [0.15, 0.35],pos)
-        init_place_entry_block(lb_arr_ml[x], entry_arr_ml[x], [0.6, 0.8],pos)
-        pos += 0.1
-    return entry_arr_names,entry_arr_ml
-
-def init_save_data():
-    for x in range(n_reactants):
-        data_names = init_entry_arr_names[x].get()
-        data_ml = init_entry_arr_ml[x].get()
-        logging([data_names, data_ml], x)
-        int_ml = int(data_ml or 0)
-        R.append(com.Vessel(x, data_names, int_ml))
-    R.append(com.Vessel(n_reactants, "main vessel", 0))
-    print (R)
-
-def update_data(entry_names, entry_amount):
-    n = len(entry_amount)
-    for x in range(n):
-        data_names = entry_names[x].get()
-        data_amount = entry_amount[x].get()
-        int_ml = int(data_amount or 0)
-        R[x].set_name(data_names)
-        R[x].set_volume(int_ml)
-        print(R[x].get_name(), "", R[x].get_volume())
-    
-
-def get_csv_data():
-    
-    with open("init_react_ml.csv", mode = 'r') as csvfile:
-        reader = csv.reader(csvfile, delimiter = ",")
-        array = list(reader)
-        n = len(array)
-        react_name = [0 for i in range(n)]
-        react_amount = [0 for i in range(n)]
-        for x in range(n):
-            react_name[x]= array[x][1]
-            react_amount[x]= array[x][2]
-            
-    return react_name, react_amount, n
-    
-
-
 # UI classes
-class initialise(tk.Tk):
-    def __init__(self, *args, **kwargs):
-        tk.Tk.__init__(self, *args, **kwargs)
+class VideoStream(object):
+    def __init__(self, src=0):
+        try:
+            self.capture = cv2.VideoCapture(1)
+        except:
+            self.capture = cv2.VideoCapture(src)
+        # Start the thread to read frames from the video stream
+        self.thread = Thread(target=self.update, args=())
+        self.thread.daemon = True
+        self.thread.start()
+        self.streaming = True
 
-        main_frame = tk.Frame(self, bg=styles["bg"])  # this is the background
+    def update(self):
+        # Read the next frame from the stream in a different thread
+        while True:
+            if self.capture.isOpened():
+                (self.status, self.frame) = self.capture.read()
+            time.sleep(.01)
+
+    def show_frame(self):
+        # Display frames in main program
+        cv2.imshow('frame', self.frame)
+        key = cv2.waitKey(1)
+        if key == ord('q'):
+            self.destroycam()
+    
+    def destroycam(self):
+        cam_check.set(0)
+        self.streaming = False
+        self.capture.release()
+        cv2.destroyAllWindows()
+        exit(1)
+
+class Frame(ctk.CTkFrame):
+    def __init__(self, master, text="", **kwargs):
+        super().__init__(master, **kwargs)
+        self.label = ctk.CTkLabel(self, text=text)
+        self.label.grid(row=0, column=0, padx=20)
+
+class initialise(ctk.CTk):
+    def __init__(self, *args, **kwargs):
+        ctk.CTk.__init__(self, *args, **kwargs)
+        main_frame = ctk.CTkFrame(self)  # this is the background
         main_frame.pack(fill="both", expand="true")
 
-        self.geometry("600x400")  # 600w x 400h pixels
+        self.geometry("900x600")
+        self.minsize(700,500)
         #self.resizable(0, 0)  # This prevents any resizing of the screen
         self.title("Initialisation")
 
-        title = tk.Label(main_frame, text = "Initialise", font=LARGE_FONT, bg = styles["bg"])
+        title = ctk.CTkLabel(main_frame, text = "Initialise", font=Title_font)
         title.place(relx = 0.5, rely = 0.1, anchor = 'center')
         
         def update_devices():
             init_module()
             #refer to actual object returned if none= do not update label
-            if len(arduino):
-                update_label(details, "arduino: '1001'\n2 Valve \n1 Pump")
-        
-        frame1 = tk.LabelFrame(main_frame, styles, text = "Setup communcation")
-        frame1.place(relx= 0.48, rely = 0.55, relwidth=0.4, relheight=0.68, anchor = 'e')
-        frame2 = tk.LabelFrame(self, styles, text = "Volume in reaction vessels")
-        frame2.place(relx= 0.52, rely=0.55, relwidth=0.4, relheight=0.68, anchor = 'w')
+            if len(arduinos):
+                text = ""
+                for arduino in arduinos:
+                    text  += "arduino: '{}' : {}\n".format(arduino.get_id(), arduino.get_components())
 
+                update_label(details, text)
         
-        bttn1 = ttk.Button(frame1, text="Initialise",
-         command=lambda: update_devices())
-        bttn1.place(relx = 0.5, rely = 0.15, anchor = 'center') 
+        frame1 = Frame(main_frame, text = "Setup communcation")
+        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.9, relheight=0.8, anchor = 'center')
+        
+        frame2 = Frame(frame1, text = "vessel details")
+        frame2.place(relx= 0.97, rely = 0.03, relwidth=0.4, relheight=0.5, anchor = 'ne')
+
+        btn1 = btn(frame1, text="Initialise", command=lambda: update_devices())
+        btn1.place(relx = 0.3, rely = 0.2, anchor = 'center') 
 
         ard_detail = "no arduino"
-        details = tk.Label(frame1, label_styles, text=ard_detail,justify= 'left')
-        details.place(relx = 0.5, rely = 0.4, anchor = 'center') 
+        details = ctk.CTkLabel(frame1, font=label_font, text=ard_detail,justify= 'left')
+        details.place(relx = 0.3, rely = 0.5, anchor = 'center') 
 
-        
-        n_react = tk.Label(frame2, label_styles, text ="Nº of reactants:")
-        n_react.place(relx = 0.3, rely = 0.15, anchor = 'center') 
-        entry_react = ttk.Entry(frame2, width=5)
-        entry_react.place(relx = 0.62, rely = 0.15, anchor = 'center') 
+        btn2 = btn(frame1, text="FINISH", command=lambda: init.destroy(), width = 80, height=30, font = label_font)
+        btn2.place(relx = 0.5, rely = 0.9, anchor = 'center') 
+        n = 3
+        ent_Rname = [0]*n
+        ent_Rvol = [0]*n
+        names, volumes =  com.read_csv("details.csv")
+        for i in range(n):
+            _, ent_Rname[i] = place_2(0.2 + 0.2*i, *entry_block(frame2, text=(str(i+1) + ': Name ')), relx = 0.25)
+            _, ent_Rvol[i]  = place_2(0.2 + 0.2*i, *entry_block(frame2, text=(' Vol: ')), relx = 0.75)
+           
+            ent_Rname[i].insert(0,names[i])
+            ent_Rvol[i].insert(0,volumes[i])
 
-        lb_ml = tk.Label(frame2, label_styles, text ="Amount in ml:", fg=styles["fg"], font=('Arial', 10, 'bold'))
-        lb_ml.place(relx = 0.48, rely = 0.28, anchor = 'e')
-
-        bttn2 = ttk.Button(self, text="FINISH",
-         command=lambda:  init.destroy())
-        bttn2.place(relx = 0.5, rely = 0.94, anchor = 'center') 
-
-        bttn3 = ttk.Button(frame2, text="Add", width= 6, command= lambda: init_entry_block(frame2,entry_react))
-        bttn3.place(relx = 0.87, rely = 0.15, anchor = 'center') 
-
-        bttn4 = ttk.Button(frame2, text="Save", width= 6, command= lambda: init_save_data() )
-        bttn4.place(relx = 0.5, rely = 0.92, anchor = 'center')
+    
+        btn1 = btn(frame2, text ='save', command=lambda: com.vessel_detail(ent_Rname, ent_Rvol))
+        btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
 
         update_devices()
-        delete_csv('init_react_ml.csv')
-        # delete_csv('commands.csv')
+
+
+
 
 class MenuBar(tk.Menu):
     def __init__(self, parent):
         tk.Menu.__init__(self, parent)
 
-        self.add_command(label="Home", command=lambda: parent.show_frame(StartPage))
+        self.configure(background= 'blue', fg='red')
 
-        self.add_command(label="Manual", command=lambda: parent.show_frame(PageOne))
+        self.add_command(label="Home", command=lambda: parent.show_frame(P_Start))
+
+        self.add_command(label="Manual", command=lambda: parent.show_frame(P_Test))
 
         menu_auto = tk.Menu(self, tearoff=0)
         self.add_cascade(label="Auto", menu=menu_auto)
-        menu_auto.add_command(label="Recipe", command=lambda: parent.show_frame(PageTwo))
+        menu_auto.add_command(label="Recipe",font=('Arial',11), command=lambda: parent.show_frame(P_Auto))
         menu_auto.add_separator()
-        menu_auto.add_command(label="iterate", command=lambda: parent.show_frame(PageThree))
+        menu_auto.add_command(label="iterate",font=('Arial',11), command=lambda: parent.show_frame(P_Iter))
 
         menu_help = tk.Menu(self, tearoff=0)
-        self.add_cascade(label="plots", menu=menu_help)
-        menu_help.add_command(label="Open New Window", command=lambda: parent.OpenNewWindow())
+        self.add_cascade(label="More", menu=menu_help)
+        menu_help.add_command(label="Parameter",font=('Arial',11), command=lambda: parent.show_frame(P_Param))
+        menu_help.add_command(label="Open New Window",font=('Arial',11), command=lambda: parent.OpenNewWindow())
+        global cam_check
+        cam_check  = tk.IntVar()
+        menu_help.add_checkbutton(label="Camera",font=('Arial',11), variable = cam_check, command=lambda: parent.Camera(cam_check.get()))
 
-class Main(tk.Tk):
+class Main(ctk.CTk):
     def __init__(self, *args, **kwargs):
-        tk.Tk.__init__(self, *args, **kwargs)
+        ctk.CTk.__init__(self, *args, **kwargs)
+        ctk.CTk.wm_title(self, "ARCaDIUS")
 
-        tk.Tk.wm_title(self, "ARCaDIUS")
-
-        self.geometry("700x431") 
-        self.minsize(500,300) 
-        container = tk.Frame(self, bg = "#BEB2A7", height=600, width=1024)
+        self.geometry("900x500") 
+        self.minsize(700,400) 
+        container = ctk.CTkFrame(self, height=600, width=1024)
         container.pack(side="top", fill = "both", expand = "true")
         container.grid_rowconfigure(0, weight= 1)
         container.grid_columnconfigure(0, weight= 1)
+        
         self.frames = {}
 
-        for F in (StartPage, PageOne, PageTwo, PageThree):
+        for F in (P_Start, P_Test, P_Auto, P_Iter, P_Hist, P_Param):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
 
-        self.show_frame(StartPage)
+        self.show_frame(P_Start)
         menubar = MenuBar(self)
-        tk.Tk.config(self, menu=menubar)
+        ctk.CTk.config(self, menu=menubar)
 
     def show_frame(self, cont):
         frame = self.frames[cont]
         frame.tkraise()
-          
+    
     def OpenNewWindow(self):
         OpenNewWindow()
 
+    def Camera(self, check):
+        global video_stream
+        if (check):
+            try:
+                del video_stream
+                video_stream = VideoStream()
+                video_stream.streaming = True
+            except:
+                video_stream = VideoStream()
+        else:
+            try:
+                video_stream.streaming = False
+                video_stream.destroycam()
+            except:
+                pass
+        
     def Quit_application(self):
         self.destroy()
 
-
-class StartPage(tk.Frame):
+class P_Start(ctk.CTkFrame):
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self,parent, bg = styles["bg"])
-        # title = tk.Label(self, text = "Home", font=LARGE_FONT, bg = styles["bg"])
-        # title.place(relx = 0.5, rely = 0.1, anchor = 'center')
-        add_image("arcadius.png", self, relx=0.5, rely=0.05, anchor = 'n')
+        ctk.CTkFrame.__init__(self, parent)
+        add_image(self, "arcadius.png", relx=0.5, rely=0.05, size=(200,40), anchor = 'n')
 
-        frame1 = tk.LabelFrame(self, styles, text = "Menu")
+        frame1 = Frame(self, fg_color="transparent")
         frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
 
-        bttn1 = ttk.Button(frame1, text="Manual",
-         command=lambda: controller.show_frame(PageOne))
-        bttn1.place(relx = 0.48, rely = 0.2, anchor = 'e')
-
-        bttn2 = ttk.Button(frame1, text="Auto",
-         command=lambda: controller.show_frame(PageTwo))
-        bttn2.place(relx = 0.52, rely = 0.2, anchor = 'w')
-
-        bttn3 = ttk.Button(frame1, text="Details",
-         command=lambda: controller.show_frame(PageTwo))
-        bttn3.place(relx = 0.48, rely = 0.3, anchor = 'e')
-
-        bttn4 = ttk.Button(frame1, text="iterate",
-         command=lambda: controller.show_frame(PageThree))
-        bttn4.place(relx = 0.52, rely = 0.3, anchor = 'w')
-
+        btn1=btn_img(frame1, "Manual", "manual.png", command=lambda: controller.show_frame(P_Test))
+        btn1.place(relx = 0.45, rely = 0.2, anchor = 'e')
         
-        # add_image("carap.png", frame1, relx=1, rely=1, anchor = 'se')
-        # add_image("carap_flip.png", frame1, relx=0, rely=1, anchor = 'sw')
-        bttn4 = ttk.Button(frame1, text="Exit",
-         command=lambda:controller.Quit_application() )
-        bttn4.place(relx = 0.5, rely = 0.9, anchor = 'center')
+        btn2=btn_img(frame1, "Automate", "auto.png", command=lambda: controller.show_frame(P_Auto))
+        btn2.place(relx = 0.55, rely = 0.2,  anchor = 'w')
 
-class PageOne(tk.Frame):
+        btn3=btn_img(frame1, "History", "book.png", command=lambda: controller.show_frame(P_Hist))
+        btn3.place(relx = 0.45, rely = 0.4, anchor = 'e')
 
+        btn4=btn_img(frame1, "Iterate", "iter.png", command=lambda: controller.show_frame(P_Iter))
+        btn4.place(relx = 0.55, rely = 0.4, anchor = 'w')
+
+        btn5=btn_img(frame1, "Parameters", "param.png", command=lambda: controller.show_frame(P_Param))
+        btn5.place(relx = 0.45, rely = 0.6, anchor = 'e')
+
+        btn6 = btn(frame1, text="Exit", command=lambda: controller.Quit_application())
+        btn6.place(relx = 0.5, rely = 0.9, anchor = 'center')
+
+class P_Param(ctk.CTkFrame):
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self,parent, bg = styles["bg"])
-        title = tk.Label(self, text = "Manual Control", font=LARGE_FONT, bg = styles["bg"])
+        ctk.CTkFrame.__init__(self,parent)
+        title = ctk.CTkLabel(self, text = "Parameters", font=Title_font)
+        title.place(relx = 0.5, rely = 0.05, anchor = 'center')
+
+        _, ent_vessel = place_2(0.1, *entry_block(self, text = "vessel"))
+        #ent_vessel.insert(R[7].get_name())
+
+class P_Test(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        ctk.CTkFrame.__init__(self,parent)
+        title = ctk.CTkLabel(self, text = "Manual Control", font=Title_font)
         title.place(relx = 0.5, rely = 0.05, anchor = 'center')
         
-        frame1 = tk.LabelFrame(self, styles, text = "Valve")
+        frame1 = Frame(self, text = "Valve")
         frame1.place(relx=0.175, rely=0.15, relwidth=0.3, relheight=0.8, anchor = 'n')
+        frame12 = Frame(frame1, text = "shutter", fg_color = 'transparent')
+        frame12.place(relx=0, rely=1, relwidth=1, relheight=0.5, anchor = 'sw')
 
-        frame2 = tk.LabelFrame(self, styles, text = "Pump")
+        frame2 = Frame(self, text = "Pump")
         frame2.place(relx=0.5, rely=0.15, relwidth=0.3, relheight=0.8, anchor = 'n')
 
-        frame3 = tk.LabelFrame(self, styles, text = "Mixer")
+        frame3 = Frame(self, text = "Mixer")
         frame3.place(relx=0.825, rely=0.15, relwidth=0.3, relheight=0.38, anchor = 'n')
 
-        frame4= tk.LabelFrame(self, styles, text = "Sensors")
+        frame4= Frame(self, text = "Sensors")
         frame4.place(relx=0.825, rely=0.55, relwidth=0.3, relheight=0.4, anchor = 'n')
 
         #box 1 Valve
-        lbl_valve = tk.Label(frame1, label_styles, text = "select valve: ")
-        lbl_valve.place(relx=0.1, rely = 0.1, anchor = 'w')
-        valve_num = tk.StringVar(value=0)
-        valve_sel = tk.Spinbox(frame1, from_=0, to=len(V), width=2,  wrap=True, textvariable=valve_num)
-        valve_sel.place(relx=0.6, rely = 0.1, anchor = 'w')
+        _, ent_valve = place_2(0.2, *entry_block(frame1, "select valve: ", spin=True, from_=1, to=len(Comps.valves)))
 
-        bttn1 = ttk.Button(frame1, text="close",
-         command=lambda: V[int(valve_num.get())].close())
-        bttn1.place(relx = 0.48, rely = 0.2, anchor = 'e')
-        bttn2 = ttk.Button(frame1, text="open",
-         command=lambda: V[int(valve_num.get())].open())
-        bttn2.place(relx = 0.52, rely = 0.2, anchor = 'w')
+        btn1 = btn(frame1, text="close", command=lambda: Comps.valves[int(ent_valve.get())-1].close())
+        btn1.place(relx = 0.48, rely = 0.3, anchor = 'e')
+        btn2 = btn(frame1, text="open", command=lambda: Comps.valves[int(ent_valve.get())-1].open())
+        btn2.place(relx = 0.52, rely = 0.3, anchor = 'w')
+        btn3 = btn(frame1, text="mid", command=lambda: Comps.valves[int(ent_valve.get())-1].mid())
+        btn3.place(relx = 0.5, rely = 0.4, anchor = 'center')
+
+        #box 1.2 Shutter
+        
+        btn1 = btn(frame12, text="close", command=lambda: Comps.shutter.close())
+        btn1.place(relx = 0.48, rely = 0.3, anchor = 'e')
+        btn2 = btn(frame12, text="open", command=lambda: Comps.shutter.open())
+        btn2.place(relx = 0.52, rely = 0.3, anchor = 'w')
+        btn3 = btn(frame12, text="mid", command=lambda: Comps.shutter.mid())
+        btn3.place(relx = 0.5, rely = 0.5, anchor = 'center')
 
         #box 2 pump
-        lbl_pump = tk.Label(frame2, label_styles, text = "select pump: ")
-        lbl_pump.place(relx=0.1, rely = 0.1, anchor = 'w')
-        pump_num=tk.StringVar(value=0)
-        pump_sel = tk.Spinbox(frame2, from_=0, to=len(P), width=2, wrap=True, textvariable=pump_num)
-        pump_sel.place(relx=0.6, rely = 0.1, anchor = 'w')
+        _, ent_pump = place_2(0.2,*entry_block(frame2, "select pump: ", spin=True, from_=1, to=len(Comps.pumps)))
+        _, ent_vol = place_2(0.3, *entry_block(frame2, "Volume (ml)"))
 
-        lbl_pump = tk.Label(frame2, label_styles, text = "volume (ml): ")
-        lbl_pump.place(relx=0.5, rely = 0.2, anchor = 'e')
-        volume=tk.StringVar()
-        vol_entry = tk.Entry(frame2, entry_styles, textvariable=volume)
-        vol_entry.place(relx=0.5, rely = 0.2, anchor = 'w')
-        bttn1 = ttk.Button(frame2, text="send",
-         command=lambda: P[int(pump_num.get())].pump(float(volume.get())))
-        bttn1.place(relx = 0.5, rely = 0.3, anchor = 'center')
+        btn1 = btn(frame2, text="send", command=lambda: Comps.pumps[int(ent_pump.get())-1].pump(float(ent_vol.get())))
+        btn1.place(relx = 0.5, rely = 0.4, anchor = 'center')
 
         #box 3 mixer
-        lbl_mix = tk.Label(frame3, label_styles, text = "time (s): ")
-        lbl_mix.place(relx=0.5, rely = 0.1, anchor = 'e')
-        time=tk.StringVar()
-        t_entry = tk.Entry(frame3, entry_styles, textvariable= time)
-        t_entry.place(relx=0.5, rely = 0.1, anchor = 'w')
-        bttn1 = ttk.Button(frame3, text="send")
-        bttn1.place(relx = 0.5, rely = 0.35, anchor = 'center')
+        _, ent_mix = place_2(0.2, *entry_block(frame3, "speed : "))
+        btn1 = btn(frame3, text="send", command=lambda: print("mixing speed: ", ent_mix.get()))
+        btn1.place(relx = 0.5, rely = 0.35, anchor = 'center')
 
-class PageTwo(tk.Frame):
-
+class P_Auto(ctk.CTkFrame):
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self,parent, bg = styles["bg"])
-        label = tk.Label(self, text = "Details", font=LARGE_FONT, bg = styles["bg"])
-        label.pack(pady=10,padx=10)
+        ctk.CTkFrame.__init__(self,parent)
+        title = ctk.CTkLabel(self, text = "Automated MVP", font=Title_font)
+        title.place(relx = 0.5, rely = 0.1, anchor = 'center')
 
-        frame1 = tk.LabelFrame(self, styles, text = "Input vessels info")
-        frame1.place(relx= 0.48, rely = 0.55, relwidth=0.4, relheight=0.8, anchor = 'e')
-        frame2 = tk.LabelFrame(self, styles, text = "Reaction vessel info")
-        frame2.place(relx= 0.52, rely=0.55, relwidth=0.4, relheight=0.8, anchor = 'w')
+        frame1 = Frame(self)
+        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+        frame2 = Frame(frame1, text='inputs')
+        frame2.place(relx= 0.25, rely = 0.55, relwidth=0.45, relheight=0.8, anchor = 'center')
+        frame3 = Frame(frame1, text='output')
+        frame3.place(relx= 0.75, rely = 0.55, relwidth=0.45, relheight=0.8, anchor = 'center')
 
-    
-        entry_names, entry_amount = update_entry_block(frame1, R)
+        ent_P = [0]*3
+        _, ent_P[0] = place_2(0.2, *entry_block(frame2, text="Reactant A"))
+        _, ent_P[1] = place_2(0.3, *entry_block(frame2, text="Reactant B"))
+        _, ent_P[2] = place_2(0.4, *entry_block(frame2, text="Reactant C"))
 
-        bttn1 = ttk.Button(frame1, text="Update",
-         command=lambda: update_data(entry_names, entry_amount))
-        bttn1.place(relx = 0.5, rely = 0.94, anchor = 'center')   
+        _, ent_I = place_2(0.5, *entry_block(frame2, text="Shutter time"))
+        
+        out_list = ["Product","Product 2", "Waste", "2 A", "2 B", "2 C"]
+        _, sel_output = place_2(0.2, *entry_block(frame3, text="Select", drop_list=out_list))
 
-        label1 = tk.Label(frame2, label_styles, text = "Amount in ml:")
-        label1.place(relx = 0.38, rely = 0.5, anchor = 'center')
-        label2 = tk.Label(frame2, label_styles, text = str(R[-1].get_volume()))
-        label2.place(relx = 0.59, rely = 0.5, anchor = 'center')
+        btn1 = btn(frame3, text="Start", command=lambda: experiment())
+        btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
+        def experiment():
+            tot_vol=0.0
+            for i in range(len(ent_P)):
+                try:
+                    vol=float(ent_P[i].get())
+                    tot_vol+=vol
+                    Comps.pumps[i].pump(vol)
+                except:pass
+            try:
+                Comps.mixer.mix(5)
+                Comps.shutter.open()
+                Comps.shutter.close()
+                Comps.mixer.mix(0)
+            except:pass
 
-class PageThree(tk.Frame):
+            try:
+                com.valve_states(Comps.valves, out_list.index(sel_output.get()))
+                Comps.pumps[3].pump(tot_vol)
+            except:pass
 
+class P_Iter(ctk.CTkFrame):
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self,parent, bg = styles["bg"])
+        ctk.CTkFrame.__init__(self,parent)
 
-        title = tk.Label(self, text = "Iterative experiment", font=LARGE_FONT, bg = styles["bg"])
+        title = ctk.CTkLabel(self, text = "Iterative experiment", font=Title_font)
         title.place(relx = 0.5, rely = 0.1, anchor = 'center')
 
         frames = [0]*5
-        frames[0] = tk.LabelFrame(self, styles, text = "Settings of experiments")
+        frames[0] = Frame(self, text = "Settings of experiments")
         frames[0].place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
-        frames[1] = tk.LabelFrame(frames[0], styles, relief='flat', text = "volume")
+        frames[1] = Frame(frames[0], text = "volume", fg_color= "transparent")
         frames[1].place(relx= 0.75, rely = 0.05, relwidth=0.25, relheight=0.6, anchor = 'ne')
-        frames[2] = tk.LabelFrame(frames[0], styles, relief='flat', text = "steps")
+        frames[2] = Frame(frames[0], text = "steps", fg_color= "transparent")
         frames[2].place(relx= 0.75, rely = 0.05, relwidth=0.25, relheight=0.6, anchor = 'nw')
-        frames[3] = tk.LabelFrame(frames[0], styles, text = "Send")
+        frames[3] = Frame(frames[0], text = "Send")
         frames[3].place(relx= 0.75, rely = 0.65, relwidth=0.4, relheight=0.3, anchor = 'n')
 
         def on_click(checkbutton_var, widgets, pos: int):
             [lbl, ent_vol, lbls, ent_step] = widgets
             if checkbutton_var.get() == 1:
-                place_entry_block(lbl, ent_vol, pos)
-                place_entry_block(lbls, ent_step, pos)
+                place_2(pos, lbl, ent_vol)
+                place_2(pos, lbls, ent_step)
             else:
                 for widget in widgets:
                     widget.place_forget()
 
             
-        lblA, ent_volA = entry_block("Liquid A:",frames[1])
-        lblsA, ent_stepA = entry_block("step A:",frames[2])
-        place_entry_block(lblA, ent_volA, 1)
-        place_entry_block(lblsA, ent_stepA, 1)
+        lblA, ent_volA = entry_block(frames[1], "Liquid A:")
+        lblsA, ent_stepA = entry_block(frames[2], "step A:")
+        place_2(0.2, lblA, ent_volA)
+        place_2(0.2, lblsA, ent_stepA)
         widgetsA = [lblA, ent_volA, lblsA, ent_stepA]
 
-        lblB, ent_volB = entry_block("Liquid B:",frames[1])
-        lblsB, ent_stepB = entry_block("step B:",frames[2])
+        lblB, ent_volB = entry_block(frames[1],"Liquid B:")
+        lblsB, ent_stepB = entry_block(frames[2],"step B:")
         widgetsB = [lblB, ent_volB, lblsB, ent_stepB]
         
-        lblcount, e_count = entry_block("iterations:",frames[3], spin=True)
-        place_entry_block(lblcount, e_count, 1)
-        bttn1 = ttk.Button(frames[3], text="Start", command=lambda: send_command())
-        bttn1.place(relx = 0.5, rely = 0.6, anchor='center') 
+        lblcount, e_count = entry_block(frames[3], "iterations:",spin=True, from_=1)
+        place_2(0.2, lblcount, e_count)
+        btn1 = btn(frames[3], text="Start", command=lambda: send_command())
+        btn1.place(relx = 0.5, rely = 0.6, anchor='center') 
 
         checkbutton_var1 = tk.IntVar(value=1)
-        checkbutton= tk.Checkbutton(frames[0], text="Reactant A", variable=checkbutton_var1, command=lambda: on_click(checkbutton_var1, widgetsA, 1))
+        checkbutton= tk.Checkbutton(frames[0], text="Reactant A", variable=checkbutton_var1, command=lambda: on_click(checkbutton_var1, widgetsA, 0.2))
         checkbutton.place(relx = 0.1, rely = 0.3, anchor='center') 
         checkbutton_var2 = tk.IntVar()
-        checkbutton= tk.Checkbutton(frames[0], text="Reactant B", variable=checkbutton_var2, command=lambda: on_click(checkbutton_var2, widgetsB, 2))
+        checkbutton= tk.Checkbutton(frames[0], text="Reactant B", variable=checkbutton_var2, command=lambda: on_click(checkbutton_var2, widgetsB, 0.3))
         checkbutton.place(relx = 0.1, rely = 0.4, anchor='center') 
 
         def send_command():
-            cmd_list = []
             Ra_ml_init = ent_volA.get()
             Ra_step = ent_stepA.get()
             Rb_ml_init = ent_volB.get()
@@ -484,21 +515,47 @@ class PageThree(tk.Frame):
             for i in range(count):
                 if Ra_ml_init!="" and Ra_step!="":
                     Ra_ml = float(Ra_ml_init) + float(Ra_step)*i
-                    cmd_list.append(P[0].pump(Ra_ml))
+                    Comps.pumps[0].pump(Ra_ml)
                 if Rb_ml_init!="" and Rb_step!="":
                     Rb_ml = float(Rb_ml_init) + float(Rb_step)*i
-                    cmd_list.append(P[1].pump(Rb_ml))
+                    Comps.pumps[1].pump(Rb_ml)
 
-            buffer.IN(cmd_list)
             return
-         
-class OpenNewWindow(tk.Tk):
 
+class P_Hist(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        ctk.CTkFrame.__init__(self,parent)     
+
+        title = ctk.CTkLabel(self, text = "History", font=Title_font)
+        title.place(relx = 0.5, rely = 0.1, anchor = 'center') 
+
+        frame1 = Frame(self)
+        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+
+        scroll = ttk.Scrollbar(frame1, orient = "vertical")
+        scroll.place(relx= 1, rely = 0.5, relwidth=0.03, relheight=1, anchor = 'e')
+
+        list = tk.Listbox(frame1, bd= 3, relief = "groove", selectmode= "SINGLE", yscrollcommand = scroll.set )
+        time, command = com.read_csv("commands.csv")
+        for x in range(len(time)):
+            list.insert(0, time[x] + " --- " + command[x])  # 0 for printing from last to first and 'end' for printing 1st to last
+
+        list.place(relx= 0, rely = 0.5, relwidth=0.97, relheight=1, anchor = 'w')
+        scroll.config( command = list.yview )
+
+        # btn1 = [[0]*10]*10
+        # for j in range(5):
+        #     for i in range(5):
+        #         btn1[i][j] = btn(frame1, "Click")
+        #         btn1[i][j].place(relx = (i+0.5)/6, rely = (j+0.5)/6, anchor = 'nw')
+        # btn1[0][2].configure(command=lambda: add_image(frame1, "carap.png", relx=0.5, rely=0.5, size= (400,400)))
+
+class OpenNewWindow(tk.Tk):
     def __init__(self, *args, **kwargs):
 
         tk.Tk.__init__(self, *args, **kwargs)
 
-        main_frame = tk.Frame(self)
+        main_frame = ctk.CTkFrame(self)
         main_frame.pack_propagate(0)
         main_frame.pack(fill="both", expand="true")
         main_frame.grid_rowconfigure(0, weight=1)
@@ -507,53 +564,60 @@ class OpenNewWindow(tk.Tk):
         self.geometry("500x200")
         self.resizable(0, 0)
 
-        frame1 = ttk.LabelFrame(main_frame, text="Plotting the results")
+        frame1 = Frame(main_frame, text="Results")
         frame1.pack(expand=True, fill="both")
 
-        label1 = tk.Label(frame1, font=("Verdana", 20), text="Plotting Page")
+        label1 = ctk.CTkLabel(frame1, font=("Verdana", 20), text="Plotting Page")
         label1.pack(side="top")
-
-
-    
 
 init = initialise()
 init.mainloop()
 
 def Event(MESSAGES):
+    #MESSAGES can be a list or single element
     for MESSAGE in MESSAGES:
         match MESSAGE[5]:
             case "E":
-                print('REPEAT')
+                pass
 
             case "V":
-                arduino[0].busy()
-                #create log function to save validated commands.
-                All_commands = buffer.READ()
-                
-                buffer.POP()
-                #print("left in the buffer:", buffer.READ())
+                arduinos[0].busy()
+                command = buffer.POP()
+                com.DECODE_LINE(command, Comps)
+                com.Log(command)
 
             case "F":
-                arduino[0].free()
+                arduinos[0].free()
                     
             case _:
                 pass
-    
-    return 
+    return
+
 def task():
-    if len(arduino):
-
-        if (arduino[0].get_device().inWaiting() > 0):
-            messages = com.SERIAL_READ_LINE(arduino[0].get_device())
-            Event(messages)
+    global device
+    if len(arduinos):
         
-        if arduino[0].get_state()==False and buffer.LENGTH()>0:
+        if (arduinos[0].state==False) and (buffer.LENGTH()>0):
             buffer.OUT() 
-
-     
+            device,_ = buffer.READ()[0]
+            arduinos[0].busy()
+        try:
+            if (device.inWaiting() > 0):
+                Event(com.READ(device))
+        except:pass
     gui.after(100, task)
+    time.sleep(0.01)
+def cam():
+    if (cam_check.get()):
+        try:
+            if (video_stream.streaming):
+                video_stream.show_frame()
+        except:
+            pass
+    gui.after(50, cam)
     time.sleep(0.01)
 #GUI
 gui = Main()
 gui.after(100,task)
+gui.after(50,cam)
 gui.mainloop()
