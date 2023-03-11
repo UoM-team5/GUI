@@ -2,7 +2,6 @@ import serial
 import serial.tools.list_ports
 import csv, datetime, os
 
-
 def ID_PORTS_AVAILABLE():
     devices = []
     for port in ['COM%s' % (i + 1) for i in range(256)]:
@@ -134,12 +133,8 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                     except:
                         pass
                 if num==4:
-                    try: 
-                        Comps.main.sub(float(vol))
-                        Comps.ves_out[Comps.valves.output_vessel].add(float(vol))
-                    except:
-                        pass
-                print("Pump num {}, vol {}, dir {} ".format(num, vol, dir) )
+                    Comps.main.sub(float(vol))
+                    Comps.ves_out[Comps.valves.output_vessel].add(float(vol))
                 return num, vol
             
             case "V":
@@ -163,23 +158,24 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                 print("Mixer num {}, state {} ".format(num, state))
                 return num,state
             
-            case "S":
+            case "S": 
                 out += " sensors "
-                sensor_amount = int((n_pk)/2)
-                Temp=[0.0]*5
-                bubb=[0]*5
-                for i in range(sensor_amount):
-                    sensor_type = pk_split[2*i+1][0]
-                    sensor_num = int(pk_split[2*i+1][1:])
-                    sensor_val = float(pk_split[2*i+2][1:])
-                    #print(i, sensor_type, sensor_num, sensor_val)
-                    if sensor_type == "T":
-                        Temp[sensor_num-1] = sensor_val
-                    elif sensor_type == "B":
-                        bubb[sensor_num-1] = int(sensor_val)
-                    else:
-                        print("unknown sensor")
-                return out + " Temperature: " + str(Temp) + " bubble " + str(bubb)
+                for idx in range(len(pk_split)):
+                    try:
+                        match pk_split[idx][0]:
+                            case 'T':
+                                senType = 'Temperature'
+                                Comps.Temp[int(pk_split[idx][1])-1] = pk_split[idx+1][1:]
+                            case 'B':
+                                senType = 'Bubble'
+                                Comps.Bubble[int(pk_split[idx][1])-1] = pk_split[idx+1][1:]
+                            case 'L':
+                                senType = 'Liquid Detection'
+                                Comps.LDS[int(pk_split[idx][1])-1] = pk_split[idx+1][1:]
+                            case _:
+                                pass
+                    except:
+                        print('Error: extra ', senType,' sensor detected')
 
             case _:
                 print("operator ",operator)
@@ -255,14 +251,13 @@ def vessel_detail(ent_Rn, ent_Rv):
 def read_detail():
     try:
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "details.csv"), mode = 'r') as csvfile:
-            reader = csv.reader(csvfile, delimiter = ",")
-            array = list(reader)
+            array = list(csv.reader(csvfile, delimiter = ","))
             n = len(array)
             names = [0 for i in range(n)]
             volumes = [0 for i in range(n)]
-            for x in range(n):
-                names[x]= array[x][0]
-                volumes[x]= array[x][1]
+            for i in range(n):
+                names[i]= array[i][0]
+                volumes[i]= array[i][1]
         return names, volumes
     except:
         return ['']*3,['']*3
@@ -278,7 +273,10 @@ class Pump:
         self.state = False
     
     def pump(self, volume: float, direction=1):
-       self.buffer.IN([self.device, "[sID1000 rID{} PK3 P{} m{:.2f} D{}]".format(self.ID, self.num, volume, direction)])
+        if volume==0.0:
+            return
+        else:
+            self.buffer.IN([self.device, "[sID1000 rID{} PK3 P{} m{:.2f} D{}]".format(self.ID, self.num, volume, direction)])
     
     def set_state(self, state: bool):
         """Param bool state: set False->idle, True->used"""
@@ -364,9 +362,6 @@ class Mixer:
     def mix(self, speed: int):
         return "[sID1000 rID{} PK2 M{} S{}]".format(self.ID, self.num, speed)
 
-class Sensor:
-    pass
-
 class Vessel: 
     def __init__(self, volume = 10.0, liquid_name = 'none'):
         self.vol = volume
@@ -451,6 +446,7 @@ class Buffer:
             print("POP")
             device, command = self.buffer.pop(0)
         return command
+    
     def READ(self) :
         # print("\nBuffer Contents:\n", *[i[1] for i in self.buffer], sep = "\n")
         # reurns 2 outputs: device, command = self.buffer
