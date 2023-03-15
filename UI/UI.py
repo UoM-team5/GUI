@@ -3,9 +3,8 @@ from tkinter import ttk
 from PIL import Image
 import customtkinter as ctk
 import Serial_lib as com 
-from Serial_lib import Pump, Valve, Shutter, Mixer, Sensor, Vessel, Nano 
+from Serial_lib import Pump, Valve, Shutter, Mixer, Vessel, Nano 
 import os, cv2, time
-from threading import Thread
 
 # UI styles 
 Title_font= ("Consolas", 30)
@@ -13,8 +12,7 @@ label_font = ("Consolas", 15, "normal")
 btn_font = ("Arial", 13, "normal")
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("dark-blue")
-#init comms
-com.delete_file()
+
 
 # UI functions
 def update_label(label, new_text):
@@ -82,6 +80,9 @@ def place_2(rely, lbl, entry, relx = 0.5):
     entry.place(relx = relx, rely = rely, anchor = 'w')
     return lbl, entry
 
+
+#init comms
+com.delete_file()
 buffer = com.Buffer()
 def init_module():
     global arduinos, device, Comps
@@ -104,7 +105,7 @@ def init_module():
 
         message = com.READ(device)
         deviceID  = message[0][0:4]
-        if deviceID=='skip':
+        if deviceID =='- st':
             deviceID=message[1][0:4]
         print("\narduino: ", deviceID)
         
@@ -141,70 +142,98 @@ def init_module():
     for i in range(len(arduinos)):
         try:arduinos.remove(0)
         except:pass
-    print("\n------------End initialisation--------------\n\n")
+    
     Comps = com.Components()
-    Comps.ves_in = R_in
-    Comps.ves_out = R_out
+    Comps.nanos = arduinos
+    Comps.ves_in = R_in     #array
+    Comps.ves_out = R_out   #array
     Comps.main = main
-    Comps.valves = V
-    Comps.pumps = P
+    Comps.valves = V        #array
+    Comps.pumps = P         #array
     Comps.mixer = M
     Comps.shutter = S
+    Comps.Temp = [-1]
+    Comps.Bubble = [-1]*3
+    Comps.LDS = [-1]*4
+    print("\n------------ End initialisation --------------\n\n")
 
-    return
 
 # UI classes
-class VideoStream(object):
-    def __init__(self, src=0):
-        try:
-            self.capture = cv2.VideoCapture(1)
-        except:
-            self.capture = cv2.VideoCapture(src)
-        # Start the thread to read frames from the video stream
-        self.thread = Thread(target=self.update, args=())
-        self.thread.daemon = True
-        self.thread.start()
-        self.streaming = True
-
-    def update(self):
-        # Read the next frame from the stream in a different thread
-        while True:
-            if self.capture.isOpened():
-                (self.status, self.frame) = self.capture.read()
-            time.sleep(.01)
-
-    def show_frame(self):
-        # Display frames in main program
-        cv2.imshow('frame', self.frame)
-        key = cv2.waitKey(1)
-        if key == ord('q'):
-            self.destroycam()
-    
-    def destroycam(self):
-        cam_check.set(0)
-        self.streaming = False
-        self.capture.release()
-        cv2.destroyAllWindows()
-        exit(1)
-
 class Frame(ctk.CTkFrame):
     def __init__(self, master, text="", **kwargs):
         super().__init__(master, **kwargs)
         self.label = ctk.CTkLabel(self, text=text)
         self.label.grid(row=0, column=0, padx=20)
 
-class initialise(ctk.CTk):
+class MenuBar(tk.Menu):
+    def __init__(self, parent):
+        tk.Menu.__init__(self, parent)
+
+        self.configure(background= 'blue', fg='red')
+
+        self.add_command(label="Home", command=lambda: parent.show_frame(P_Home))
+
+        self.add_command(label="Manual", command=lambda: parent.show_frame(P_Test))
+
+        menu_auto = tk.Menu(self, tearoff=0)
+        self.add_cascade(label="Auto", menu=menu_auto)
+        menu_auto.add_command(label="MVP",font=('Arial',11), command=lambda: parent.show_frame(P_Auto))
+        menu_auto.add_separator()
+        menu_auto.add_command(label="iterate",font=('Arial',11), command=lambda: parent.show_frame(P_Iter))
+
+        menu_help = tk.Menu(self, tearoff=0)
+        self.add_cascade(label="More", menu=menu_help)
+        menu_help.add_command(label="Parameter",font=('Arial',11), command=lambda: parent.show_frame(P_Param))
+        menu_help.add_command(label="Open New Window",font=('Arial',11), command=lambda: parent.OpenNewWindow())
+        menu_help.add_command(label="Camera",font=('Arial',11), command=lambda: parent.show_frame(P_Cam))
+
+class Main(ctk.CTk):
     def __init__(self, *args, **kwargs):
         ctk.CTk.__init__(self, *args, **kwargs)
-        main_frame = ctk.CTkFrame(self)  # this is the background
-        main_frame.pack(fill="both", expand="true")
+        ctk.CTk.wm_title(self, "ARCaDIUS")
+        self.geometry("900x500") 
+        self.minsize(700,400) 
+        container = ctk.CTkFrame(self, height=600, width=1024)
+        container.pack(side="top", fill = "both", expand = "true")
+        container.grid_rowconfigure(0, weight= 1)
+        container.grid_columnconfigure(0, weight= 1)
 
-        self.geometry("900x600")
-        self.minsize(700,500)
-        #self.resizable(0, 0)  # This prevents any resizing of the screen
-        self.title("Initialisation")
+        self.frames = {}
 
-        title = ctk.CTkLabel(main_frame, text = "Initialise", font=Title_font)
+        for F in (P_Init, P_Home, P_Test, P_Auto, P_Iter, P_Hist, P_Param, P_Cam):
+            frame = F(container, self)
+            self.frames[F] = frame
+            frame.grid(row=0, column=0, sticky="nsew")
+
+        self.show_frame(P_Init)
+
+        menubar = MenuBar(self)
+        ctk.CTk.config(self, menu=menubar)
+        self.connect_cam()
+
+    def show_frame(self, cont):
+        frame = self.frames[cont]
+        frame.tkraise()
+        self.visible_frame = cont
+
+    def connect_cam(self):
+        vid = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+        if not vid.isOpened():
+            vid = cv2.VideoCapture(0)
+        self.vid_frame_size = (int(vid.get(3)),int(vid.get(4)))
+        self.vid = vid
+
+    def OpenNewWindow(self):
+        OpenNewWindow()
+
+    def Quit_application(self):
+        self.destroy()
+
+class P_Init(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        ctk.CTkFrame.__init__(self, parent)
+
+        title = ctk.CTkLabel(self, text = "Initialise", font=Title_font)
         title.place(relx = 0.5, rely = 0.1, anchor = 'center')
         
         def update_devices():
@@ -217,7 +246,7 @@ class initialise(ctk.CTk):
 
                 update_label(details, text)
         
-        frame1 = Frame(main_frame, text = "Setup communcation")
+        frame1 = Frame(self, text = "Setup communcation")
         frame1.place(relx= 0.5, rely = 0.55, relwidth=0.9, relheight=0.8, anchor = 'center')
         
         frame2 = Frame(frame1, text = "vessel details")
@@ -230,12 +259,12 @@ class initialise(ctk.CTk):
         details = ctk.CTkLabel(frame1, font=label_font, text=ard_detail,justify= 'left')
         details.place(relx = 0.3, rely = 0.5, anchor = 'center') 
 
-        btn2 = btn(frame1, text="FINISH", command=lambda: init.destroy(), width = 80, height=30, font = label_font)
+        btn2 = btn(frame1, text="FINISH", command=lambda: controller.show_frame(P_Home), width = 100, height=30, font = label_font)
         btn2.place(relx = 0.5, rely = 0.9, anchor = 'center') 
         n = 3
         ent_Rname = [0]*n
         ent_Rvol = [0]*n
-        names, volumes =  com.read_csv("details.csv")
+        names, volumes =  com.read_detail("details.csv")
         for i in range(n):
             _, ent_Rname[i] = place_2(0.2 + 0.2*i, *entry_block(frame2, text=(str(i+1) + ': Name ')), relx = 0.25)
             _, ent_Rvol[i]  = place_2(0.2 + 0.2*i, *entry_block(frame2, text=(' Vol: ')), relx = 0.75)
@@ -249,83 +278,7 @@ class initialise(ctk.CTk):
 
         update_devices()
 
-
-
-
-class MenuBar(tk.Menu):
-    def __init__(self, parent):
-        tk.Menu.__init__(self, parent)
-
-        self.configure(background= 'blue', fg='red')
-
-        self.add_command(label="Home", command=lambda: parent.show_frame(P_Start))
-
-        self.add_command(label="Manual", command=lambda: parent.show_frame(P_Test))
-
-        menu_auto = tk.Menu(self, tearoff=0)
-        self.add_cascade(label="Auto", menu=menu_auto)
-        menu_auto.add_command(label="Recipe",font=('Arial',11), command=lambda: parent.show_frame(P_Auto))
-        menu_auto.add_separator()
-        menu_auto.add_command(label="iterate",font=('Arial',11), command=lambda: parent.show_frame(P_Iter))
-
-        menu_help = tk.Menu(self, tearoff=0)
-        self.add_cascade(label="More", menu=menu_help)
-        menu_help.add_command(label="Parameter",font=('Arial',11), command=lambda: parent.show_frame(P_Param))
-        menu_help.add_command(label="Open New Window",font=('Arial',11), command=lambda: parent.OpenNewWindow())
-        global cam_check
-        cam_check  = tk.IntVar()
-        menu_help.add_checkbutton(label="Camera",font=('Arial',11), variable = cam_check, command=lambda: parent.Camera(cam_check.get()))
-
-class Main(ctk.CTk):
-    def __init__(self, *args, **kwargs):
-        ctk.CTk.__init__(self, *args, **kwargs)
-        ctk.CTk.wm_title(self, "ARCaDIUS")
-
-        self.geometry("900x500") 
-        self.minsize(700,400) 
-        container = ctk.CTkFrame(self, height=600, width=1024)
-        container.pack(side="top", fill = "both", expand = "true")
-        container.grid_rowconfigure(0, weight= 1)
-        container.grid_columnconfigure(0, weight= 1)
-        
-        self.frames = {}
-
-        for F in (P_Start, P_Test, P_Auto, P_Iter, P_Hist, P_Param):
-            frame = F(container, self)
-            self.frames[F] = frame
-            frame.grid(row=0, column=0, sticky="nsew")
-
-        self.show_frame(P_Start)
-        menubar = MenuBar(self)
-        ctk.CTk.config(self, menu=menubar)
-
-    def show_frame(self, cont):
-        frame = self.frames[cont]
-        frame.tkraise()
-    
-    def OpenNewWindow(self):
-        OpenNewWindow()
-
-    def Camera(self, check):
-        global video_stream
-        if (check):
-            try:
-                del video_stream
-                video_stream = VideoStream()
-                video_stream.streaming = True
-            except:
-                video_stream = VideoStream()
-        else:
-            try:
-                video_stream.streaming = False
-                video_stream.destroycam()
-            except:
-                pass
-        
-    def Quit_application(self):
-        self.destroy()
-
-class P_Start(ctk.CTkFrame):
+class P_Home(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self, parent)
         add_image(self, "arcadius.png", relx=0.5, rely=0.05, size=(200,40), anchor = 'n')
@@ -347,6 +300,9 @@ class P_Start(ctk.CTkFrame):
 
         btn5=btn_img(frame1, "Parameters", "param.png", command=lambda: controller.show_frame(P_Param))
         btn5.place(relx = 0.45, rely = 0.6, anchor = 'e')
+
+        btn4=btn_img(frame1, "Camera", "cam.png", command=lambda: controller.show_frame(P_Cam))
+        btn4.place(relx = 0.55, rely = 0.6, anchor = 'w')
 
         btn6 = btn(frame1, text="Exit", command=lambda: controller.Quit_application())
         btn6.place(relx = 0.5, rely = 0.9, anchor = 'center')
@@ -436,6 +392,9 @@ class P_Auto(ctk.CTkFrame):
 
         btn1 = btn(frame3, text="Start", command=lambda: experiment())
         btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
+        btn2 = btn(frame3, text="Wash", command=lambda: com.WASH(Comps.P, Comps.V, Comps.mixer, Comps.shutter)) 
+        btn2.place(relx = 0.5, rely = 0.9, anchor = 'center')
+
         def experiment():
             tot_vol=0.0
             for i in range(len(ent_P)):
@@ -536,7 +495,7 @@ class P_Hist(ctk.CTkFrame):
         scroll.place(relx= 1, rely = 0.5, relwidth=0.03, relheight=1, anchor = 'e')
 
         list = tk.Listbox(frame1, bd= 3, relief = "groove", selectmode= "SINGLE", yscrollcommand = scroll.set )
-        time, command = com.read_csv("commands.csv")
+        time, command = com.read_detail("commands.csv")
         for x in range(len(time)):
             list.insert(0, time[x] + " --- " + command[x])  # 0 for printing from last to first and 'end' for printing 1st to last
 
@@ -550,6 +509,29 @@ class P_Hist(ctk.CTkFrame):
         #         btn1[i][j].place(relx = (i+0.5)/6, rely = (j+0.5)/6, anchor = 'nw')
         # btn1[0][2].configure(command=lambda: add_image(frame1, "carap.png", relx=0.5, rely=0.5, size= (400,400)))
 
+class P_Cam(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        ctk.CTkFrame.__init__(self,parent)
+        
+        label = ctk.CTkLabel(self, text="")
+        label.place(relx = 0.5, rely = 0.5, anchor = 'center')
+
+        def update_cam():
+            try:
+                if (controller.visible_frame==P_Cam):
+                    #only update camera if frame is raised.
+                    _, frame = controller.vid.read()
+                    
+                    opencv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+                    captured_image = Image.fromarray(opencv_image).transpose(Image.FLIP_LEFT_RIGHT)
+                    photo_image = ctk.CTkImage(captured_image, size=controller.vid_frame_size)
+                    label.photo_image = photo_image
+                    label.configure(image=photo_image)
+            except:
+                pass
+            label.after(50, update_cam)
+        update_cam()
+        
 class OpenNewWindow(tk.Tk):
     def __init__(self, *args, **kwargs):
 
@@ -569,9 +551,6 @@ class OpenNewWindow(tk.Tk):
 
         label1 = ctk.CTkLabel(frame1, font=("Verdana", 20), text="Plotting Page")
         label1.pack(side="top")
-
-init = initialise()
-init.mainloop()
 
 def Event(MESSAGES):
     #MESSAGES can be a list or single element
@@ -596,7 +575,6 @@ def Event(MESSAGES):
 def task():
     global device
     if len(arduinos):
-        
         if (arduinos[0].state==False) and (buffer.LENGTH()>0):
             buffer.OUT() 
             device,_ = buffer.READ()[0]
@@ -604,20 +582,12 @@ def task():
         try:
             if (device.inWaiting() > 0):
                 Event(com.READ(device))
-        except:pass
-    gui.after(100, task)
-    time.sleep(0.01)
-def cam():
-    if (cam_check.get()):
-        try:
-            if (video_stream.streaming):
-                video_stream.show_frame()
         except:
             pass
-    gui.after(50, cam)
+    gui.after(100, task)
     time.sleep(0.01)
+
 #GUI
 gui = Main()
 gui.after(100,task)
-gui.after(50,cam)
 gui.mainloop()
