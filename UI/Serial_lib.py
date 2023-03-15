@@ -262,18 +262,15 @@ def read_detail(filename:str):
     except:
         return ['']*3,['']*3
     
-def WASH(P, V, mixer, shutter):
-    for i in len(3):
-        shutter.close()
-        P[2].pump(40)
-        mixer.mix(5) #what are options for speed?
-        mixer.mix(0)
-        V[0].close()
-        V[1].close()
-        V[2].close()
-        V[3].close()
-        V[4].close()
-        P[3].pump(40)
+def WASH(Comps):
+    for i in range(3):
+        Comps.shutter.close()
+        Comps.pumps[2].pump(40)
+        Comps.mixer.mix(1) #what are options for speed?
+        #Comps.buffer.BLOCK()
+        Comps.mixer.mix(0)
+        valve_states(Comps.valves, 5)
+        Comps.pumps[3].pump(40)
 
 #components
 class Pump:
