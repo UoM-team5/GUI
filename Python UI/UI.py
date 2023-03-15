@@ -500,13 +500,18 @@ class P_Hist(ctk.CTkFrame):
         scroll = ttk.Scrollbar(frame1, orient = "vertical")
         scroll.place(relx= 1, rely = 0.5, relwidth=0.03, relheight=1, anchor = 'e')
 
-        list = tk.Listbox(frame1, bd= 3, relief = "groove", selectmode= "SINGLE", yscrollcommand = scroll.set )
-        time, command = com.read_detail("commands.csv")
-        for x in range(len(time)):
-            list.insert(0, time[x] + " --- " + command[x])  # 0 for printing from last to first and 'end' for printing 1st to last
-
+        list = tk.Listbox(frame1, bd= 3, relief = "groove", selectmode= "SINGLE", yscrollcommand = scroll.set)
         list.place(relx= 0, rely = 0.5, relwidth=0.97, relheight=1, anchor = 'w')
         scroll.config( command = list.yview )
+
+        btn1 = btn(self, text="Update", command=lambda: update_history(list))
+        btn1.place(relx = 0.5, rely = 0.95, anchor = 'center')
+
+        def update_history(list):
+            list.delete(0, 'end') #clear the list before updating
+            time, command = com.read_detail("commands.csv")
+            for x in range(len(time)):
+                list.insert(0, time[x] + " --- " + command[x])  # 0 for printing from last to first and 'end' for printing 1st to last
 
 class P_Cam(ctk.CTkFrame):
     def __init__(self, parent, controller):
