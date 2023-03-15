@@ -129,11 +129,11 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                 if num==(1 or 2 or 3):
                     try: 
                         Comps.ves_in[num-1].sub(float(vol))
-                        Comps.main.add(float(vol))
+                        Comps.ves_main.add(float(vol))
                     except:
                         pass
                 if num==4:
-                    Comps.main.sub(float(vol))
+                    Comps.ves_main.sub(float(vol))
                     Comps.ves_out[Comps.valves.output_vessel].add(float(vol))
                 return num, vol
             
@@ -248,20 +248,29 @@ def vessel_detail(ent_Rn, ent_Rv):
     save_detail(names, volumes)
     return
 
-def read_detail():
+def read_detail(filename:str):
     try:
-        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "details.csv"), mode = 'r') as csvfile:
+        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), filename), mode = 'r') as csvfile:
             array = list(csv.reader(csvfile, delimiter = ","))
             n = len(array)
-            names = [0 for i in range(n)]
-            volumes = [0 for i in range(n)]
+            first_col = [0 for i in range(n)]
+            second_col = [0 for i in range(n)]
             for i in range(n):
-                names[i]= array[i][0]
-                volumes[i]= array[i][1]
-        return names, volumes
+                first_col[i]= array[i][0]
+                second_col[i]= array[i][1]
+        return first_col, second_col
     except:
         return ['']*3,['']*3
     
+def WASH(Comps):
+    for i in range(3):
+        Comps.shutter.close()
+        Comps.pumps[2].pump(40)
+        Comps.mixer.mix(1) #what are options for speed?
+        #Comps.buffer.BLOCK()
+        Comps.mixer.mix(0)
+        valve_states(Comps.valves, 5)
+        Comps.pumps[3].pump(40)
 
 #components
 class Pump:
@@ -338,13 +347,13 @@ class Shutter:
         self.state = 0
          
     def close(self):
-        self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S0]".format(self.ID, self.num)])
+        self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S2]".format(self.ID, self.num)])
 
     def open(self):
         self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S1]".format(self.ID, self.num)])
 
     def mid(self):
-        self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S2]".format(self.ID, self.num)])
+        self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S0]".format(self.ID, self.num)])
 
     def set_state(self, state: int):
         self.state = state
@@ -360,7 +369,7 @@ class Mixer:
         self.buffer = buffer
 
     def mix(self, speed: int):
-        return "[sID1000 rID{} PK2 M{} S{}]".format(self.ID, self.num, speed)
+        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, speed)])
 
 class Vessel: 
     def __init__(self, volume = 10.0, liquid_name = 'none'):
@@ -438,14 +447,24 @@ class Buffer:
 
     def OUT(self):
         if len(self.buffer):
-            # device, command = self.buffer[0]
-            WRITE(*self.buffer[0])
-
+            if (not self.blocked) and self.buffer[0][0]=='WAIT':
+                print('Blocked')
+                self.TIME()
+            
+            if self.blocked:
+                if datetime.now().timestamp()>self.time_to_unblock:
+                    print('Unblocked')
+                    self.blocked=False
+                    self.POP()
+            else:
+                device, command = self.buffer[0]
+                WRITE(*self.buffer[0])
+        
     def POP(self):
         if len(self.buffer):
             print("POP")
             device, command = self.buffer.pop(0)
-        return command
+            return command
     
     def READ(self) :
         # print("\nBuffer Contents:\n", *[i[1] for i in self.buffer], sep = "\n")
@@ -458,3 +477,12 @@ class Buffer:
 
     def RESET(self):
         self.buffer = []
+
+    def BLOCK(self, seconds: float):
+        self.seconds = seconds
+        self.buffer.append(['WAIT', str(seconds)])
+    
+    def TIME(self):
+        start_time = datetime.now().timestamp()
+        self.time_to_unblock = self.seconds + start_time
+        self.blocked = True

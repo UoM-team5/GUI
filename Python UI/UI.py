@@ -87,14 +87,15 @@ buffer = com.Buffer()
 def init_module():
     global arduinos, device, Comps
     Ports = com.ID_PORTS_AVAILABLE()
+    
     arduinos = [0]*5
-    V = [0]*5
-    P = [0]*4
-    S = 0
-    M = 0
-    R_in = [0]*3
-    R_out = [0]*6
-    main = Vessel(0, "main")
+    valves = [0]*5
+    pumps = [0]*4
+    shutter = 0
+    mixer = 0
+    ves_in = [0]*3
+    ves_out = [0]*6
+    ves_main = Vessel(0, "ves_main")
 
     for i in range(len(Ports)):
         print("\nSource: ", Ports[i])
@@ -104,6 +105,7 @@ def init_module():
             time.sleep(0.1)
 
         message = com.READ(device)
+        
         deviceID  = message[0][0:4]
         if deviceID =='- st':
             deviceID=message[1][0:4]
@@ -112,46 +114,48 @@ def init_module():
         if deviceID=="1001":
             arduinos[0] = Nano(device, deviceID)
             arduinos[0].add_component("Pump 1")
-            R_in[0] = Vessel()
-            P[0] = Pump(device, deviceID, 1, buffer)
+            
+            ves_in[0] = Vessel()
+            pumps[0] = Pump(device, deviceID, 1, buffer)
         if deviceID=="1002":
             arduinos[1] = Nano(device, deviceID)
             arduinos[1].add_component("Pump 2")
-            R_in[1] = Vessel()
-            P[1] = Pump(device, deviceID, 2, buffer)
+            ves_in[1] = Vessel()
+            pumps[1] = Pump(device, deviceID, 2, buffer)
         if deviceID=="1003":
             arduinos[2] = Nano(device, deviceID)
             arduinos[2].add_component("Pump 3")
-            R_in[2] = Vessel()
-            P[2] = Pump(device, deviceID, 3, buffer)
+            ves_in[2] = Vessel()
+            pumps[2] = Pump(device, deviceID, 3, buffer)
         if deviceID=="1004":
             arduinos[3] = Nano(device, deviceID)
             arduinos[3].add_component("Pump 4, V1-V5")
             for i in range(5):
-                V[i] = Valve(device, deviceID, i+1, buffer)
+                valves[i] = Valve(device, deviceID, i+1, buffer)
             for i in range(6):
-                R_out[i] = Vessel(0, 'Product '+str(i))
+                ves_out[i] = Vessel(0, 'Product '+str(i))
             
-            P[3] = Pump(device, deviceID, 4, buffer)
+            pumps[3] = Pump(device, deviceID, 4, buffer)
         if deviceID=="1005":
             arduinos[4] = Nano(device, deviceID)
             arduinos[4].add_component("shutter")
-            M = Mixer(device, deviceID, 1, buffer)
-            S = Shutter(device, deviceID, 1, buffer)
+            shutter = Shutter(device, deviceID, 1, buffer)
+            mixer = Mixer(device, deviceID, 1, buffer)
     
     for i in range(len(arduinos)):
         try:arduinos.remove(0)
         except:pass
     
     Comps = com.Components()
-    Comps.nanos = arduinos
-    Comps.ves_in = R_in     #array
-    Comps.ves_out = R_out   #array
-    Comps.main = main
-    Comps.valves = V        #array
-    Comps.pumps = P         #array
-    Comps.mixer = M
-    Comps.shutter = S
+    Comps.buffer = buffer
+    Comps.arduinos = arduinos  #array
+    Comps.ves_in = ves_in     #array
+    Comps.ves_out = ves_out   #array
+    Comps.ves_main = ves_main
+    Comps.valves = valves        #array
+    Comps.pumps = pumps         #array
+    Comps.mixer = mixer
+    Comps.shutter = shutter
     Comps.Temp = [-1]
     Comps.Bubble = [-1]*3
     Comps.LDS = [-1]*4
@@ -233,7 +237,7 @@ class P_Init(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self, parent)
 
-        title = ctk.CTkLabel(self, text = "Initialise", font=Title_font)
+        title = ctk.CTkLabel(self, text = "SETUP", font=Title_font)
         title.place(relx = 0.5, rely = 0.1, anchor = 'center')
         
         def update_devices():
@@ -248,33 +252,16 @@ class P_Init(ctk.CTkFrame):
         
         frame1 = Frame(self, text = "Setup communcation")
         frame1.place(relx= 0.5, rely = 0.55, relwidth=0.9, relheight=0.8, anchor = 'center')
-        
-        frame2 = Frame(frame1, text = "vessel details")
-        frame2.place(relx= 0.97, rely = 0.03, relwidth=0.4, relheight=0.5, anchor = 'ne')
 
-        btn1 = btn(frame1, text="Initialise", command=lambda: update_devices())
-        btn1.place(relx = 0.3, rely = 0.2, anchor = 'center') 
+        btn1 = btn(frame1, text="Initialise", command=lambda: update_devices(), width = 200, height=30, font = label_font)
+        btn1.place(relx = 0.5, rely = 0.2, anchor = 'center') 
 
         ard_detail = "no arduino"
         details = ctk.CTkLabel(frame1, font=label_font, text=ard_detail,justify= 'left')
-        details.place(relx = 0.3, rely = 0.5, anchor = 'center') 
+        details.place(relx = 0.5, rely = 0.5, anchor = 'center') 
 
         btn2 = btn(frame1, text="FINISH", command=lambda: controller.show_frame(P_Home), width = 100, height=30, font = label_font)
         btn2.place(relx = 0.5, rely = 0.9, anchor = 'center') 
-        n = 3
-        ent_Rname = [0]*n
-        ent_Rvol = [0]*n
-        names, volumes =  com.read_detail()
-        for i in range(n):
-            _, ent_Rname[i] = place_2(0.2 + 0.2*i, *entry_block(frame2, text=(str(i+1) + ': Name ')), relx = 0.25)
-            _, ent_Rvol[i]  = place_2(0.2 + 0.2*i, *entry_block(frame2, text=(' Vol: ')), relx = 0.75)
-           
-            ent_Rname[i].insert(0,names[i])
-            ent_Rvol[i].insert(0,volumes[i])
-
-    
-        btn1 = btn(frame2, text ='save', command=lambda: com.vessel_detail(ent_Rname, ent_Rvol))
-        btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
 
         update_devices()
 
@@ -312,9 +299,26 @@ class P_Param(ctk.CTkFrame):
         ctk.CTkFrame.__init__(self,parent)
         title = ctk.CTkLabel(self, text = "Parameters", font=Title_font)
         title.place(relx = 0.5, rely = 0.05, anchor = 'center')
+        frame1 = Frame(self, fg_color="transparent")
+        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+        
+        frame2 = Frame(frame1, text = 'Vessels')
+        frame2.place(relx= 0, rely = 0.5, relwidth=0.5, relheight=0.8, anchor = 'w')
 
-        _, ent_vessel = place_2(0.1, *entry_block(self, text = "vessel"))
-        #ent_vessel.insert(R[7].get_name())
+
+        n = 3
+        ent_Rname = [0]*n
+        ent_Rvol = [0]*n
+        names, volumes =  com.read_detail('details.csv')
+        for i in range(n):
+            _, ent_Rname[i] = place_2(0.2 + 0.2*i, *entry_block(frame2, text=(str(i+1) + ': Name ')), relx = 0.25)
+            _, ent_Rvol[i]  = place_2(0.2 + 0.2*i, *entry_block(frame2, text=(' Vol: ')), relx = 0.75)
+           
+            ent_Rname[i].insert(0,names[i])
+            ent_Rvol[i].insert(0,volumes[i])
+
+        btn1 = btn(frame2, text ='save', command=lambda: com.vessel_detail(ent_Rname, ent_Rvol))
+        btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
 
 class P_Test(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -364,7 +368,7 @@ class P_Test(ctk.CTkFrame):
 
         #box 3 mixer
         _, ent_mix = place_2(0.2, *entry_block(frame3, "speed : "))
-        btn1 = btn(frame3, text="send", command=lambda: print("mixing speed: ", ent_mix.get()))
+        btn1 = btn(frame3, text="send", command=lambda: Comps.mixer.mix(int(ent_mix.get())))
         btn1.place(relx = 0.5, rely = 0.35, anchor = 'center')
 
 class P_Auto(ctk.CTkFrame):
@@ -392,6 +396,9 @@ class P_Auto(ctk.CTkFrame):
 
         btn1 = btn(frame3, text="Start", command=lambda: experiment())
         btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
+        btn2 = btn(frame3, text="Wash", command=lambda: com.WASH(Comps)) 
+        btn2.place(relx = 0.5, rely = 0.9, anchor = 'center')
+
         def experiment():
             tot_vol=0.0
             for i in range(len(ent_P)):
@@ -403,6 +410,8 @@ class P_Auto(ctk.CTkFrame):
             try:
                 Comps.mixer.mix(5)
                 Comps.shutter.open()
+                try:Comps.buffer.BLOCK(float(ent_I.get()))
+                except: pass
                 Comps.shutter.close()
                 Comps.mixer.mix(0)
             except:pass
@@ -487,12 +496,17 @@ class P_Hist(ctk.CTkFrame):
 
         frame1 = Frame(self)
         frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
-        btn1 = [[0]*10]*10
-        for j in range(5):
-            for i in range(5):
-                btn1[i][j] = btn(frame1, "Click")
-                btn1[i][j].place(relx = (i+0.5)/6, rely = (j+0.5)/6, anchor = 'nw')
-        btn1[0][2].configure(command=lambda: add_image(frame1, "carap.png", relx=0.5, rely=0.5, size= (400,400)))
+
+        scroll = ttk.Scrollbar(frame1, orient = "vertical")
+        scroll.place(relx= 1, rely = 0.5, relwidth=0.03, relheight=1, anchor = 'e')
+
+        list = tk.Listbox(frame1, bd= 3, relief = "groove", selectmode= "SINGLE", yscrollcommand = scroll.set )
+        time, command = com.read_detail("commands.csv")
+        for x in range(len(time)):
+            list.insert(0, time[x] + " --- " + command[x])  # 0 for printing from last to first and 'end' for printing 1st to last
+
+        list.place(relx= 0, rely = 0.5, relwidth=0.97, relheight=1, anchor = 'w')
+        scroll.config( command = list.yview )
 
 class P_Cam(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -539,6 +553,7 @@ class OpenNewWindow(tk.Tk):
 
 def Event(MESSAGES):
     #MESSAGES can be a list or single element
+    print("message received")
     for MESSAGE in MESSAGES:
         match MESSAGE[5]:
             case "E":
