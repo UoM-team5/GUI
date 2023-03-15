@@ -392,7 +392,7 @@ class P_Auto(ctk.CTkFrame):
 
         btn1 = btn(frame3, text="Start", command=lambda: experiment())
         btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
-        btn2 = btn(frame3, text="Wash", command=lambda: com.WASH(Comps.P, Comps.V, Comps.mixer, Comps.shutter)) 
+        btn2 = btn(frame3, text="Wash", command=lambda: com.WASH(Comps)) 
         btn2.place(relx = 0.5, rely = 0.9, anchor = 'center')
 
         def experiment():
