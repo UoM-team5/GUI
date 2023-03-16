@@ -272,7 +272,6 @@ class P_Init(ctk.CTkFrame):
             ent_Rname[i].insert(0,names[i])
             ent_Rvol[i].insert(0,volumes[i])
 
-    
         btn1 = btn(frame2, text ='save', command=lambda: com.vessel_detail(ent_Rname, ent_Rvol))
         btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
 
@@ -489,25 +488,23 @@ class P_Hist(ctk.CTkFrame):
         title.place(relx = 0.5, rely = 0.1, anchor = 'center') 
 
         frame1 = Frame(self)
-        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+        frame1.place(relx= 0.5, rely = 0.53, relwidth=0.8, relheight=0.75, anchor = 'center')
 
         scroll = ttk.Scrollbar(frame1, orient = "vertical")
         scroll.place(relx= 1, rely = 0.5, relwidth=0.03, relheight=1, anchor = 'e')
-
-        list = tk.Listbox(frame1, bd= 3, relief = "groove", selectmode= "SINGLE", yscrollcommand = scroll.set )
-        time, command = com.read_detail("commands.csv")
-        for x in range(len(time)):
-            list.insert(0, time[x] + " --- " + command[x])  # 0 for printing from last to first and 'end' for printing 1st to last
-
+        
+        list = tk.Listbox(frame1, bd= 3, relief = "groove", selectmode= "SINGLE", yscrollcommand = scroll.set)
         list.place(relx= 0, rely = 0.5, relwidth=0.97, relheight=1, anchor = 'w')
         scroll.config( command = list.yview )
 
-        # btn1 = [[0]*10]*10
-        # for j in range(5):
-        #     for i in range(5):
-        #         btn1[i][j] = btn(frame1, "Click")
-        #         btn1[i][j].place(relx = (i+0.5)/6, rely = (j+0.5)/6, anchor = 'nw')
-        # btn1[0][2].configure(command=lambda: add_image(frame1, "carap.png", relx=0.5, rely=0.5, size= (400,400)))
+        btn1 = btn(self, text="Update", command=lambda: update_history(list))
+        btn1.place(relx = 0.5, rely = 0.95, anchor = 'center')
+
+        def update_history(list):
+            list.delete(0, 'end') #clear the list before updating
+            time, command = com.read_detail("commands.csv")
+            for x in range(len(time)):
+                list.insert(0, time[x] + " --- " + command[x])  # 0 for printing from last to first and 'end' for printing 1st to last
 
 class P_Cam(ctk.CTkFrame):
     def __init__(self, parent, controller):
