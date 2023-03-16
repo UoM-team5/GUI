@@ -256,8 +256,8 @@ def read_detail(filename:str):
             first_col = [0 for i in range(n)]
             second_col = [0 for i in range(n)]
             for i in range(n):
-                names[i]= array[i][0]
-                volumes[i]= array[i][1]
+                first_col[i]= array[i][0]
+                second_col[i]= array[i][1]
         return first_col, second_col
     except:
         return ['']*3,['']*3
@@ -271,6 +271,7 @@ def WASH(Comps):
         Comps.mixer.mix(0)
         valve_states(Comps.valves, 5)
         Comps.pumps[3].pump(40)
+        
 
 #components
 class Pump:
