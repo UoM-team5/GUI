@@ -23,7 +23,7 @@ def OPEN_SERIAL_PORT(DEV):
         Dev = serial.Serial(port=DEV,baudrate=115200, timeout=.1)
         Dev.isOpen()
     except (OSError, serial.SerialException,ValueError):
-        pass
+        return None
     
     return Dev
 
@@ -438,6 +438,7 @@ class Buffer:
     def __init__(self, size=20):
         self.buffer = []
         self.size = size
+        self.blocked=False
 
     def IN(self, device_command: list):
         if len(self.buffer)<self.size:
@@ -445,31 +446,37 @@ class Buffer:
         else: 
             print("buffer full")
 
-    def OUT(self):
+    def OUT(self, arduinos):
         if len(self.buffer):
             if (not self.blocked) and self.buffer[0][0]=='WAIT':
                 print('Blocked')
-                self.TIME()
+                self.START_BLOCK()
+                
             
             if self.blocked:
-                if datetime.now().timestamp()>self.time_to_unblock:
+                if datetime.datetime.now().timestamp()>self.time_to_unblock:
                     print('Unblocked')
                     self.blocked=False
                     self.POP()
+                    arduinos[0].free()
+                    WRITE(*self.buffer[0])
             else:
-                device, command = self.buffer[0]
                 WRITE(*self.buffer[0])
         
     def POP(self):
         if len(self.buffer):
             print("POP")
             device, command = self.buffer.pop(0)
+            print(command)
             return command
     
     def READ(self) :
-        # print("\nBuffer Contents:\n", *[i[1] for i in self.buffer], sep = "\n")
-        # reurns 2 outputs: device, command = self.buffer
-        return self.buffer
+        command_list=[]
+        device_list=[]
+        for content in self.buffer: 
+            device_list.append(content[0])
+            command_list.append(content[1])
+        return command_list
 
     def LENGTH(self):
         #print("length of buffer:", len(self.buffer))
@@ -482,7 +489,9 @@ class Buffer:
         self.seconds = seconds
         self.buffer.append(['WAIT', str(seconds)])
     
-    def TIME(self):
-        start_time = datetime.now().timestamp()
+    def START_BLOCK(self):
+        start_time = datetime.datetime.now().timestamp()
         self.time_to_unblock = self.seconds + start_time
         self.blocked = True
+
+

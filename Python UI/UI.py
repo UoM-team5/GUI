@@ -359,6 +359,7 @@ class P_Test(ctk.CTkFrame):
         btn3 = btn(frame12, text="mid", command=lambda: Comps.shutter.mid())
         btn3.place(relx = 0.5, rely = 0.5, anchor = 'center')
 
+
         #box 2 pump
         _, ent_pump = place_2(0.2,*entry_block(frame2, "select pump: ", spin=True, from_=1, to=len(Comps.pumps)))
         _, ent_vol = place_2(0.3, *entry_block(frame2, "Volume (ml)"))
@@ -408,12 +409,10 @@ class P_Auto(ctk.CTkFrame):
                     Comps.pumps[i].pump(vol)
                 except:pass
             try:
-                Comps.mixer.mix(5)
                 Comps.shutter.open()
                 try:Comps.buffer.BLOCK(float(ent_I.get()))
                 except: pass
                 Comps.shutter.close()
-                Comps.mixer.mix(0)
             except:pass
 
             try:
@@ -495,7 +494,10 @@ class P_Hist(ctk.CTkFrame):
         title.place(relx = 0.5, rely = 0.1, anchor = 'center') 
 
         frame1 = Frame(self)
-        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+        frame1.place(relx= 0.95, rely = 0.55, relwidth=0.4, relheight=0.8, anchor = 'e')
+
+        frame2 = ctk.CTkScrollableFrame(self)
+        frame2.place(relx= 0.05, rely = 0.55, relwidth=0.4, relheight=0.8, anchor = 'w')
 
         scroll = ttk.Scrollbar(frame1, orient = "vertical")
         scroll.place(relx= 1, rely = 0.5, relwidth=0.03, relheight=1, anchor = 'e')
@@ -506,7 +508,28 @@ class P_Hist(ctk.CTkFrame):
             list.insert(0, time[x] + " --- " + command[x])  # 0 for printing from last to first and 'end' for printing 1st to last
 
         list.place(relx= 0, rely = 0.5, relwidth=0.97, relheight=1, anchor = 'w')
-        scroll.config( command = list.yview )
+        scroll.config(command = list.yview )
+
+
+        
+        btn1 = btn(self, text="clear all", command=lambda: buffer.RESET())
+        btn1.place(relx = 0.5, rely = 0.5, anchor = 'center')
+        btn2 = btn(self, text="skip next", command=lambda: buffer.POP())
+        btn2.place(relx = 0.5, rely = 0.4, anchor = 'center')
+        
+        frame2.label = ctk.CTkLabel(frame2)
+        frame2.label.grid(row=0, column=0, padx=20)
+        def update_buffer_list():
+            commands = buffer.READ()
+            text=''
+            for command in commands:
+                text += command+'\n'
+            frame2.label.configure(text=text, font = label_font, anchor= 'w')
+            frame2.label.after(500, update_buffer_list)
+        update_buffer_list()
+
+
+
 
 class P_Cam(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -522,7 +545,7 @@ class P_Cam(ctk.CTkFrame):
                     _, frame = controller.vid.read()
                     
                     opencv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
-                    captured_image = Image.fromarray(opencv_image).transpose(Image.FLIP_LEFT_RIGHT)
+                    captured_image = Image.fromarray(opencv_image) #.transpose(Image.FLIP_LEFT_RIGHT)
                     photo_image = ctk.CTkImage(captured_image, size=controller.vid_frame_size)
                     label.photo_image = photo_image
                     label.configure(image=photo_image)
@@ -553,7 +576,6 @@ class OpenNewWindow(tk.Tk):
 
 def Event(MESSAGES):
     #MESSAGES can be a list or single element
-    print("message received")
     for MESSAGE in MESSAGES:
         match MESSAGE[5]:
             case "E":
@@ -576,18 +598,19 @@ def task():
     global device
     if len(arduinos):
         if (arduinos[0].state==False) and (buffer.LENGTH()>0):
-            buffer.OUT() 
-            device,_ = buffer.READ()[0]
-            arduinos[0].busy()
+            buffer.OUT(arduinos)
+            if not buffer.blocked:
+                device,_ = buffer.READ()[0]
+                arduinos[0].busy()
         try:
             if (device.inWaiting() > 0):
                 Event(com.READ(device))
         except:
             pass
-    gui.after(100, task)
+    gui.after(200, task)
     time.sleep(0.01)
 
 #GUI
 gui = Main()
-gui.after(100,task)
+gui.after(200,task)
 gui.mainloop()
