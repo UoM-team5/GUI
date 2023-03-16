@@ -495,11 +495,11 @@ class P_Hist(ctk.CTkFrame):
         title.place(relx = 0.5, rely = 0.1, anchor = 'center') 
 
         frame1 = Frame(self)
-        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+        frame1.place(relx= 0.5, rely = 0.53, relwidth=0.8, relheight=0.75, anchor = 'center')
 
         scroll = ttk.Scrollbar(frame1, orient = "vertical")
         scroll.place(relx= 1, rely = 0.5, relwidth=0.03, relheight=1, anchor = 'e')
-
+        
         list = tk.Listbox(frame1, bd= 3, relief = "groove", selectmode= "SINGLE", yscrollcommand = scroll.set)
         list.place(relx= 0, rely = 0.5, relwidth=0.97, relheight=1, anchor = 'w')
         scroll.config( command = list.yview )
