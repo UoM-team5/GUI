@@ -264,6 +264,7 @@ class P_Init(ctk.CTkFrame):
         btn2.place(relx = 0.5, rely = 0.9, anchor = 'center') 
 
         update_devices()
+        
 
 class P_Home(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -400,6 +401,7 @@ class P_Auto(ctk.CTkFrame):
         btn2 = btn(frame3, text="Wash", command=lambda: com.WASH(Comps)) 
         btn2.place(relx = 0.5, rely = 0.9, anchor = 'center')
 
+
         def experiment():
             tot_vol=0.0
             for i in range(len(ent_P)):
@@ -506,7 +508,6 @@ class P_Hist(ctk.CTkFrame):
         list.place(relx= 0, rely = 0.5, relwidth=0.97, relheight=1, anchor = 'w')
         scroll.config(command = list.yview )
 
-
         
         btn1 = btn(self, text="clear all", command=lambda: buffer.RESET())
         btn1.place(relx = 0.5, rely = 0.5, anchor = 'center')
@@ -522,19 +523,17 @@ class P_Hist(ctk.CTkFrame):
                 text += command+'\n'
             frame2.label.configure(text=text, font = label_font, anchor= 'w')
             frame2.label.after(500, update_buffer_list)
+            
         update_buffer_list()
 
-
-
-
-        btn1 = btn(self, text="Update", command=lambda: update_history(list))
-        btn1.place(relx = 0.5, rely = 0.95, anchor = 'center')
-
-        def update_history(list):
+        def update_history():
             list.delete(0, 'end') #clear the list before updating
             time, command = com.read_detail("commands.csv")
             for x in range(len(time)):
                 list.insert(0, time[x] + " --- " + command[x])  # 0 for printing from last to first and 'end' for printing 1st to last
+            list.after(500, update_history)
+
+        update_history()
 
 class P_Cam(ctk.CTkFrame):
     def __init__(self, parent, controller):
