@@ -96,6 +96,7 @@ def init_module():
     ves_in = [0]*3
     ves_out = [0]*6
     ves_main = Vessel(0, "ves_main")
+    ID_array = [] 
 
     for i in range(len(Ports)):
         print("\nSource: ", Ports[i])
@@ -108,17 +109,19 @@ def init_module():
         message = com.READ(device)
         
         deviceID  = message[0][0:4]
-        ID_array = []
         ID_array.append(deviceID)
+
         if deviceID =='- st':
             deviceID=message[1][0:4]
         print("\narduino: ", deviceID)
+
+        clear_serial = com.READ(device)
 
         #ask for details of the device
         com.WRITE(device, "[sID1000 rID1001 PK1 DETAIL]")
 
         while(device.inWaiting() == 0):
-            time.sleep(0.2)
+            time.sleep(0.1)
         
         #Problem here! Doesn't read details
         details = com.READ(device)
@@ -158,7 +161,10 @@ def init_module():
             shutter = Shutter(device, deviceID, 1, buffer)
             mixer = Mixer(device, deviceID, 1, buffer)
     
-    com.check_missing_dev(ID_array)
+    if not ID_array:
+        print("\nNo arduinos conected")
+    else: 
+        com.check_missing_dev(ID_array)
     
     for i in range(len(arduinos)):
         try:arduinos.remove(0)
