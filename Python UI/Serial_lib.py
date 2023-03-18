@@ -267,10 +267,51 @@ def WASH(Comps):
         Comps.shutter.close()
         Comps.pumps[2].pump(40)
         Comps.mixer.mix(1) #what are options for speed?
-        #Comps.buffer.BLOCK()
+        Comps.buffer.BLOCK(5)
         Comps.mixer.mix(0)
         valve_states(Comps.valves, 5)
         Comps.pumps[3].pump(40)
+
+def assert_detail(deviceID, detail):
+    match deviceID:
+        case "1001":
+            # give trueDetail how the detail package looks like 
+            trueDetail = "[sID1001 rID1000 PK6 P2 V0 I1 M1 T0 B1 L1 (This is an example string)]"
+            if detail == trueDetail:
+                print ("Details OK\n")
+            else:
+                print ("Details WRONG!\n")               
+        case "1002":
+            trueDetail = "Write how details pack for arduino 1002 looks like here"
+            if detail == trueDetail:
+                print ("Details OK")
+            else:
+                print ("Details WRONG!\n")
+        case "1003":
+            trueDetail = "Write how details pack for arduino 1003 looks like here"
+            if detail == trueDetail:
+                print ("Details OK\n")
+            else:
+                print ("Details WRONG!\n")    
+        case "1004":
+            trueDetail = "Write how details pack for arduino 1004 looks like here"
+            if detail == trueDetail:
+                print ("Details OK\n")
+            else:
+                print ("Details WRONG!\n")
+        case "1005":
+            trueDetail = "Write how details pack for arduino 1005 looks like here"
+            if detail == trueDetail:
+                print ("Details OK\n")
+            else:
+                print ("Details WRONG!\n")
+                
+def check_missing_dev(array):
+    if "1001" not in array: print("Arduino 1001 missing")
+    if "1002" not in array: print("Arduino 1002 missing")
+    if "1003" not in array: print("Arduino 1003 missing")
+    if "1004" not in array: print("Arduino 1004 missing")
+    if "1005" not in array: print("Arduino 1005 missing")
 
 #components
 class Pump:
@@ -493,5 +534,3 @@ class Buffer:
         start_time = datetime.datetime.now().timestamp()
         self.time_to_unblock = self.seconds + start_time
         self.blocked = True
-
-
