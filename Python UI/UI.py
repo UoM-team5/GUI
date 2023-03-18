@@ -101,15 +101,31 @@ def init_module():
         print("\nSource: ", Ports[i])
         device = com.OPEN_SERIAL_PORT(Ports[i])
         print("\nDevice: ", device)
+
         while(device.inWaiting() == 0):
             time.sleep(0.1)
 
         message = com.READ(device)
         
         deviceID  = message[0][0:4]
+        ID_array = []
+        ID_array.append(deviceID)
         if deviceID =='- st':
             deviceID=message[1][0:4]
         print("\narduino: ", deviceID)
+
+        #ask for details of the device
+        com.WRITE(device, "[sID1000 rID1001 PK1 DETAIL]")
+
+        while(device.inWaiting() == 0):
+            time.sleep(0.2)
+        
+        #Problem here! Doesn't read details
+        details = com.READ(device)
+
+        print("\narduino: ", deviceID)
+        print("Details: ", details)
+        com.assert_detail(deviceID, details)
         
         if deviceID=="1001":
             arduinos[0] = Nano(device, deviceID)
@@ -141,6 +157,8 @@ def init_module():
             arduinos[4].add_component("shutter")
             shutter = Shutter(device, deviceID, 1, buffer)
             mixer = Mixer(device, deviceID, 1, buffer)
+    
+    com.check_missing_dev(ID_array)
     
     for i in range(len(arduinos)):
         try:arduinos.remove(0)
@@ -265,7 +283,6 @@ class P_Init(ctk.CTkFrame):
 
         update_devices()
         
-
 class P_Home(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self, parent)
