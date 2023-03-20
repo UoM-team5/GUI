@@ -80,7 +80,7 @@ class MyStr(str):
         return self.__contains__(other)
 
 def DECODE_PACKAGE(senderID, PK, Comps):
-    n_pk = int(PK[2:4])
+    n_pk = int(PK[2:4]) 
     pk_split = PK.split(" ", n_pk)
     operator = MyStr(pk_split[1])
     out = str(senderID)
@@ -176,6 +176,9 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                                 pass
                     except:
                         print('Error: extra ', senType,' sensor detected')
+
+            case "D":
+                return PK
 
             case _:
                 print("operator ",operator)
@@ -276,7 +279,7 @@ def assert_detail(deviceID, detail):
     match deviceID:
         case "1001":
             # give trueDetail how the detail package looks like 
-            trueDetail = "[sID1001 rID1000 PK6 P2 V0 I1 M1 T0 B1 L1 (This is an example string)]"
+            trueDetail = "PK8 DETAIL P2 V0 I1 M1 T0 B1 L1 (This is an example string)"
             if detail == trueDetail:
                 print ("Details OK\n")
             else:
