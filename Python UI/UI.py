@@ -115,20 +115,17 @@ def init_module():
             deviceID=message[1][0:4]
         print("\narduino: ", deviceID)
 
-        clear_serial = com.READ(device)
-
         #ask for details of the device
         com.WRITE(device, "[sID1000 rID1001 PK1 DETAIL]")
 
         while(device.inWaiting() == 0):
             time.sleep(0.1)
-        
-        #Problem here! Doesn't read details
+
         details = com.READ(device)
 
         print("\narduino: ", deviceID)
-        print("Details: ", details)
-        com.assert_detail(deviceID, details)
+        print("Details: ", details[2])
+        com.assert_detail(deviceID, details[2])
         
         if deviceID=="1001":
             arduinos[0] = Nano(device, deviceID)
