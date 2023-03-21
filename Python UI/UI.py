@@ -79,7 +79,50 @@ def place_2(rely, lbl, entry, relx = 0.5):
     lbl.place(relx = relx-0.05, rely = rely, anchor = 'e')
     entry.place(relx = relx, rely = rely, anchor = 'w')
     return lbl, entry
+    
+def popup(text):
+    popup = tk.Tk()
+    popup.wm_title("Warning!")
+    w = 250
+    h = 100
 
+    # get screen width and height
+    ws = popup.winfo_screenwidth() 
+    hs = popup.winfo_screenheight()
+
+    # calculate x and y coordinates for the Tk root window
+    x = (ws/2) - (w/2)
+    y = (hs/2) - (h/2)
+
+    popup.geometry('%dx%d+%d+%d' % (w, h, x, y))
+    
+    label = ttk.Label(popup, text=text, font=btn_font)
+    label.pack(side="top", fill="x", padx= 10, pady=10)
+    B1 = ttk.Button(popup, text="Okay", command = popup.destroy)
+    B1.pack(pady=10)
+    popup.mainloop()
+
+def check_isnumber(value, type = 'float'):
+    if value != '':
+        if type == 'float':
+            try:
+                float(value)
+                value = float(value)
+                return value
+            except ValueError:
+                popup('Please, insert a number')
+        if type == 'int':
+            try:
+                float(value)
+                value = int(value)
+                return value
+            except ValueError:
+                popup('Please, insert an integer')
+    else:
+        pass
+
+            
+        
 
 #init comms
 com.delete_file()
@@ -364,11 +407,11 @@ class P_Test(ctk.CTkFrame):
         #box 1 Valve
         _, ent_valve = place_2(0.2, *entry_block(frame1, "select valve: ", spin=True, from_=1, to=len(Comps.valves)))
 
-        btn1 = btn(frame1, text="close", command=lambda: Comps.valves[int(ent_valve.get())-1].close())
+        btn1 = btn(frame1, text="close", command=lambda: Comps.valves[check_isnumber(ent_valve.get(), 'int')-1].close())
         btn1.place(relx = 0.48, rely = 0.3, anchor = 'e')
-        btn2 = btn(frame1, text="open", command=lambda: Comps.valves[int(ent_valve.get())-1].open())
+        btn2 = btn(frame1, text="open", command=lambda: Comps.valves[check_isnumber(ent_valve.get(), 'int')-1].open())
         btn2.place(relx = 0.52, rely = 0.3, anchor = 'w')
-        btn3 = btn(frame1, text="mid", command=lambda: Comps.valves[int(ent_valve.get())-1].mid())
+        btn3 = btn(frame1, text="mid", command=lambda: Comps.valves[check_isnumber(ent_valve.get(), 'int')-1].mid())
         btn3.place(relx = 0.5, rely = 0.4, anchor = 'center')
 
         #box 1.2 Shutter
@@ -385,12 +428,12 @@ class P_Test(ctk.CTkFrame):
         _, ent_pump = place_2(0.2,*entry_block(frame2, "select pump: ", spin=True, from_=1, to=len(Comps.pumps)))
         _, ent_vol = place_2(0.3, *entry_block(frame2, "Volume (ml)"))
 
-        btn1 = btn(frame2, text="send", command=lambda: Comps.pumps[int(ent_pump.get())-1].pump(float(ent_vol.get())))
+        btn1 = btn(frame2, text="send", command=lambda: Comps.pumps[check_isnumber(ent_pump.get(), 'int')-1].pump(check_isnumber(ent_vol.get())))
         btn1.place(relx = 0.5, rely = 0.4, anchor = 'center')
 
         #box 3 mixer
         _, ent_mix = place_2(0.2, *entry_block(frame3, "speed : "))
-        btn1 = btn(frame3, text="send", command=lambda: Comps.mixer.mix(int(ent_mix.get())))
+        btn1 = btn(frame3, text="send", command=lambda: Comps.mixer.mix(check_isnumber(ent_mix.get(), 'int')))
         btn1.place(relx = 0.5, rely = 0.35, anchor = 'center')
 
 class P_Auto(ctk.CTkFrame):
@@ -426,13 +469,13 @@ class P_Auto(ctk.CTkFrame):
             tot_vol=0.0
             for i in range(len(ent_P)):
                 try:
-                    vol=float(ent_P[i].get())
+                    vol=check_isnumber(ent_P[i].get())
                     tot_vol+=vol
                     Comps.pumps[i].pump(vol)
                 except:pass
             try:
                 Comps.shutter.open()
-                try:Comps.buffer.BLOCK(float(ent_I.get()))
+                try:Comps.buffer.BLOCK(check_isnumber(ent_I.get()))
                 except: pass
                 Comps.shutter.close()
             except:pass
@@ -550,7 +593,7 @@ class P_Hist(ctk.CTkFrame):
             list.delete(0, 'end') #clear the list before updating
             time, command = com.read_detail("commands.csv")
             for x in range(len(time)):
-                list.insert(0, time[x] + " --- " + command[x])  # 0 for printing from last to first and 'end' for printing 1st to last
+                list.insert(0, time[x] + "   " + command[x])  # 0 for printing from last to first and 'end' for printing 1st to last
             list.after(500, update_history)
 
         update_history()
