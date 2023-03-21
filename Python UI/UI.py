@@ -113,7 +113,7 @@ def check_isnumber(value, type = 'float'):
                 popup('Please, insert a number')
         if type == 'int':
             try:
-                float(value)
+                int(value)
                 value = int(value)
                 return value
             except ValueError:
