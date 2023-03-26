@@ -1,6 +1,7 @@
 import serial
 import serial.tools.list_ports
-import csv, datetime, os
+import csv, datetime, os, requests, cv2
+from chump import Application
 
 def ID_PORTS_AVAILABLE():
     devices = []
@@ -80,7 +81,7 @@ class MyStr(str):
         return self.__contains__(other)
 
 def DECODE_PACKAGE(senderID, PK, Comps):
-    n_pk = int(PK[2:4]) 
+    n_pk = int(PK[2:4])
     pk_split = PK.split(" ", n_pk)
     operator = MyStr(pk_split[1])
     out = str(senderID)
@@ -177,9 +178,6 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                     except:
                         print('Error: extra ', senType,' sensor detected')
 
-            case "D":
-                return PK
-
             case _:
                 print("operator ",operator)
                 return out + " unrecognised cmd package: " + PK
@@ -270,52 +268,46 @@ def WASH(Comps):
         Comps.shutter.close()
         Comps.pumps[2].pump(40)
         Comps.mixer.mix(1) #what are options for speed?
-        Comps.buffer.BLOCK(5)
+        #Comps.buffer.BLOCK()
         Comps.mixer.mix(0)
         valve_states(Comps.valves, 5)
         Comps.pumps[3].pump(40)
 
-def assert_detail(deviceID, detail):
-    match deviceID:
-        case "1001":
-            # give trueDetail how the detail package looks like 
-            trueDetail = "PK8 DETAIL P2 V0 I1 M1 T0 B1 L1 (This is an example string)"
-            if detail == trueDetail:
-                print ("Details OK\n")
-            else:
-                print ("Details WRONG!\n")               
-        case "1002":
-            trueDetail = "Write how details pack for arduino 1002 looks like here"
-            if detail == trueDetail:
-                print ("Details OK")
-            else:
-                print ("Details WRONG!\n")
-        case "1003":
-            trueDetail = "Write how details pack for arduino 1003 looks like here"
-            if detail == trueDetail:
-                print ("Details OK\n")
-            else:
-                print ("Details WRONG!\n")    
-        case "1004":
-            trueDetail = "Write how details pack for arduino 1004 looks like here"
-            if detail == trueDetail:
-                print ("Details OK\n")
-            else:
-                print ("Details WRONG!\n")
-        case "1005":
-            trueDetail = "Write how details pack for arduino 1005 looks like here"
-            if detail == trueDetail:
-                print ("Details OK\n")
-            else:
-                print ("Details WRONG!\n")
-                
-def check_missing_dev(array):
-    if "1001" not in array: print("Arduino 1001 missing")
-    if "1002" not in array: print("Arduino 1002 missing")
-    if "1003" not in array: print("Arduino 1003 missing")
-    if "1004" not in array: print("Arduino 1004 missing")
-    if "1005" not in array: print("Arduino 1005 missing")
+class notif():
+    def __init__(self, app_token = 'adehgb6cn6939abbvchyaj7pt7yst', user_key = 'usoz8aw4jmejvo8mr29i49cwm26gyd'):
+        self.app_token=app_token
+        self.user_key=user_key
+        try:
+            self.app = Application(self.app_token)
+            self.user = self.app.get_user(self.user_key)
+            print('App: ', self.app.is_authenticated,', User: ', self.user.is_authenticated, '\nName = ', self.user.devices)
+        except:
+            print('No Phone detected: check apptoken / user key / wifi connection')
+        # self.send('MVP loading')
+    
+    def set_token(self, app_token, user_key):
+        self.app_token=app_token
+        self.user_key=user_key
+        self.app = Application(self.app_token)
+        self.user = self.app.get_user(self.user_key)
+    
+    def send(self, text: str):
+        try:
+            message = self.user.send_message(text)
+            # print(message.is_sent, message.id, str(message.sent_at))
+        except:
+            pass
 
+    def image(self, image, text= 'camera'):
+        cv2.imshow(image)
+        r=requests.post("https://api.pushover.net/1/messages.json", data = {
+        "token": self.app_token,
+        "user": self.user_key,
+        "message": text
+        },
+        files = {
+        "attachment": ("image.jpg", image, "image/jpeg")
+        })
 #components
 class Pump:
     def __init__(self, device, ID, component_number: int, buffer):
@@ -325,11 +317,11 @@ class Pump:
         self.num = component_number
         self.state = False
     
-    def pump(self, volume: float, direction=1):
+    def pump(self, volume: float):
         if volume==0.0:
             return
         else:
-            self.buffer.IN([self.device, "[sID1000 rID{} PK3 P{} m{:.2f} D{}]".format(self.ID, self.num, volume, direction)])
+            self.buffer.IN([self.device, "[sID1000 rID{} PK3 P{} m{:.2f}]".format(self.ID, self.num, volume)])
     
     def set_state(self, state: bool):
         """Param bool state: set False->idle, True->used"""
@@ -391,13 +383,13 @@ class Shutter:
         self.state = 0
          
     def close(self):
-        self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S2]".format(self.ID, self.num)])
-
-    def open(self):
         self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S1]".format(self.ID, self.num)])
 
-    def mid(self):
+    def open(self):
         self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S0]".format(self.ID, self.num)])
+
+    def mid(self):
+        self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S2]".format(self.ID, self.num)])
 
     def set_state(self, state: int):
         self.state = state
@@ -490,23 +482,26 @@ class Buffer:
         else: 
             print("buffer full")
 
-    def OUT(self, arduinos):
+    def OUT(self):
         if len(self.buffer):
-            if (not self.blocked) and self.buffer[0][0]=='WAIT':
-                print('Blocked')
-                self.START_BLOCK()
+            if (not self.blocked):
+                if self.buffer[0][0]=='WAIT':
+                    print('Blocked')
+                    self.START_BLOCK()
+                elif self.buffer[0][0]=='NOTIF':
+                    self.phone.send(self.buffer[0][1])
+                    self.POP()
+
+            if (not self.blocked) and len(self.buffer):
+                WRITE(*self.buffer[0])
                 
-            
             if self.blocked:
                 if datetime.datetime.now().timestamp()>self.time_to_unblock:
                     print('Unblocked')
                     self.blocked=False
                     self.POP()
-                    arduinos[0].free()
                     WRITE(*self.buffer[0])
-            else:
-                WRITE(*self.buffer[0])
-        
+            
     def POP(self):
         if len(self.buffer):
             print("POP")
@@ -514,6 +509,12 @@ class Buffer:
             print(command)
             return command
     
+    def POP_LAST(self):
+        if len(self.buffer):
+            device, command = self.buffer.pop(-1)
+            print(command)
+            return command
+        
     def READ(self) :
         command_list=[]
         device_list=[]
@@ -522,7 +523,10 @@ class Buffer:
             command_list.append(content[1])
         return command_list
 
-    def LENGTH(self):
+    def READ_DEVICE(self) :
+        return self.buffer[0][0]
+    
+    def Left(self):
         #print("length of buffer:", len(self.buffer))
         return len(self.buffer)
 
@@ -537,3 +541,6 @@ class Buffer:
         start_time = datetime.datetime.now().timestamp()
         self.time_to_unblock = self.seconds + start_time
         self.blocked = True
+
+    def NOTIFY(self, text = 'DONE'):
+        self.buffer.append(['NOTIF', text])
