@@ -1,0 +1,40 @@
+body {
+	background: white;
+	color: black;
+	text-align: center;
+	font-size: 30px;
+}
+
+header {
+	text-align: center;
+	font-size: 40px;
+	padding-bottom: 20px;
+	padding-top: 30px;
+	background: #ffffff;
+}
+
+p {
+	text-align: left;
+	font-size: 15px;
+}
+
+h1{
+	font-size: 30px;
+}
+
+/* Create two columns/boxes that floats next to each other */
+Image_stream {
+	float: left;
+	width: 40%;
+	height: 50%;
+	background: #ccc;
+	padding: 10px;
+}
+
+Control{
+	float: right;
+	padding: 10px;
+	width: 55%;
+	background-color: #f1f1f1;
+	height: 50%;
+}

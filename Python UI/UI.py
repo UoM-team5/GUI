@@ -4,15 +4,52 @@ from PIL import Image
 import customtkinter as ctk
 import Serial_lib as com 
 from Serial_lib import Pump, Valve, Shutter, Mixer, Vessel, Nano 
-import os, cv2, time
+import os, cv2, time, multiprocessing
+from flask import Flask, render_template, Response
+from chump import Application
 
+#pyinstaller --onedir -w --add-data "c:\users\idan\appdata\local\programs\python\python310\lib\site-packages\customtkinter;customtkinter\" UI.py
 # UI styles 
-Title_font= ("Consolas", 30)
-label_font = ("Consolas", 15, "normal")
-btn_font = ("Arial", 13, "normal")
-ctk.set_appearance_mode("light")
+font_XS = ("Consolas", 15, "normal")
+font_S = ("Consolas", 18, "normal")
+font_M = ("Consolas", 25, "normal")
+font_L = ("Consolas", 30, "normal")
+def set_mode(i: int):
+    if i==0: ctk.set_appearance_mode("light")
+    if i==1: ctk.set_appearance_mode("dark")
+set_mode(1)
 ctk.set_default_color_theme("dark-blue")
 
+class ProgressBar():
+    def __init__(self, master, buffer):
+        self.Pbar = ctk.CTkProgressBar(master, width= 300, height=25, corner_radius=5)
+        self.buffer = buffer
+    
+    def SET(self, n_tasks: int):
+        self.Pbar.place(relx=0.5, rely=0.4, anchor='center')
+        self.Pbar.set(0)
+        self.n_tasks = n_tasks
+    
+    def refresh(self):
+        ratio = (self.n_tasks-self.buffer.Left())/self.n_tasks
+        self.Pbar.set(ratio)
+        if ratio==1:
+            self.Pbar.place_forget()
+            ratio=0.0
+
+class MyTabView(ctk.CTkTabview):
+    def __init__(self, master, pages = ["Module", "Vessels", "Phone"], **kwargs):
+        super().__init__(master, **kwargs)
+
+        for page in pages:
+            self.add(page)
+
+class MyLabel(ctk.CTkLabel):
+    def __init__(self, master, text="NA", font=font_S, **kwargs):
+        super().__init__(master,text=text, font=font, **kwargs)
+        
+    def update(self, new_text: str, **kwargs):
+        self.configure(text = new_text, **kwargs)
 
 # UI functions
 def update_label(label, new_text):
@@ -25,7 +62,7 @@ def add_image(frame, file_name, relx, rely, size = (200,40), anchor='center'):
     label.image = photo
     label.place(relx = relx, rely = rely, anchor = anchor)
 
-def btn(frame, text: str, command=None, width=50, height=20, font=btn_font):
+def btn(frame, text: str, command=None, width=50, height=20, font=font_XS):
     btn = ctk.CTkButton(frame, 
                         text=text,
                         font=font,
@@ -56,11 +93,11 @@ def btn_img(frame, text: str,  file_name: str, command=None, Xresize = 30, Yresi
     btn.image = photo
     return btn
 
-def entry_block(frame, text: str, spin=False, from_ = 0, to = 10, drop_list=None):
+def entry_block(frame, text: str, spin=False, from_ = 0, to = 10, drop_list=None, wrap=True, **kwargs):
     """label followed by entry widget"""
-    lbl = ctk.CTkLabel(frame, text = text)
+    lbl = ctk.CTkLabel(frame, font=font_XS, text = text)
     if (spin):
-        entry = ttk.Spinbox(frame, from_=from_, to=to, width=2, wrap=True)
+        entry = ttk.Spinbox(frame, from_=from_, to=to, width=5, font= font_XS, wrap=wrap, **kwargs)
         entry.set(from_)
     elif (type(drop_list) == list):
         entry = ctk.CTkOptionMenu(frame,
@@ -70,6 +107,7 @@ def entry_block(frame, text: str, spin=False, from_ = 0, to = 10, drop_list=None
         entry = ctk.CTkEntry(frame,
                             width=50,
                             height=25,
+                            font=font_XS,
                             border_width=0,
                             corner_radius=2)
 
@@ -79,7 +117,7 @@ def place_2(rely, lbl, entry, relx = 0.5):
     lbl.place(relx = relx-0.05, rely = rely, anchor = 'e')
     entry.place(relx = relx, rely = rely, anchor = 'w')
     return lbl, entry
-    
+
 def popup(text):
     popup = tk.Tk()
     popup.wm_title("Warning!")
@@ -96,7 +134,7 @@ def popup(text):
 
     popup.geometry('%dx%d+%d+%d' % (w, h, x, y))
     
-    label = ttk.Label(popup, text=text, font=btn_font)
+    label = ttk.Label(popup, text=text, font=font_M)
     label.pack(side="top", fill="x", padx= 10, pady=10)
     B1 = ttk.Button(popup, text="Okay", command = popup.destroy)
     B1.pack(pady=10)
@@ -120,17 +158,17 @@ def check_isnumber(value, type = 'float'):
                 popup('Please, insert an integer')
     else:
         pass
-
-            
-        
-
+    
 #init comms
 com.delete_file()
+phone = com.notif()
 buffer = com.Buffer()
-def init_module():
-    global arduinos, device, Comps
+Comps = com.Components()
+def init_module(label=None):
+    global arduinos, device
+    try: com.CLOSE_SERIAL_PORT(arduinos)
+    except: pass
     Ports = com.ID_PORTS_AVAILABLE()
-    
     arduinos = [0]*5
     valves = [0]*5
     pumps = [0]*4
@@ -139,56 +177,41 @@ def init_module():
     ves_in = [0]*3
     ves_out = [0]*6
     ves_main = Vessel(0, "ves_main")
-    ID_array = [] 
 
     for i in range(len(Ports)):
         print("\nSource: ", Ports[i])
         device = com.OPEN_SERIAL_PORT(Ports[i])
         print("\nDevice: ", device)
-
         while(device.inWaiting() == 0):
             time.sleep(0.1)
 
         message = com.READ(device)
         
         deviceID  = message[0][0:4]
-        ID_array.append(deviceID)
-
-        if deviceID =='- st':
-            deviceID=message[1][0:4]
         print("\narduino: ", deviceID)
-
-        #ask for details of the device
-        com.WRITE(device, "[sID1000 rID1001 PK1 DETAIL]")
-
-        while(device.inWaiting() == 0):
-            time.sleep(0.1)
-
-        details = com.READ(device)
-
-        print("\narduino: ", deviceID)
-        print("Details: ", details[2])
-        com.assert_detail(deviceID, details[2])
         
         if deviceID=="1001":
-            arduinos[0] = Nano(device, deviceID)
-            arduinos[0].add_component("Pump 1")
+            arduinos[0] = Nano(device, deviceID, Ports[i])
+            arduinos[0].add_component("Input Module 1, pump 1")
             
             ves_in[0] = Vessel()
             pumps[0] = Pump(device, deviceID, 1, buffer)
+            pumps[1] = Pump(device, deviceID, 2, buffer)
+            shutter = Shutter(device, deviceID, 1, buffer)
+            mixer = Mixer(device, deviceID, 1, buffer)
         if deviceID=="1002":
-            arduinos[1] = Nano(device, deviceID)
-            arduinos[1].add_component("Pump 2")
+            arduinos[1] = Nano(device, deviceID, Ports[i])
+            arduinos[1].add_component("Input Module 2, pump 2")
             ves_in[1] = Vessel()
             pumps[1] = Pump(device, deviceID, 2, buffer)
         if deviceID=="1003":
-            arduinos[2] = Nano(device, deviceID)
-            arduinos[2].add_component("Pump 3")
+            arduinos[2] = Nano(device, deviceID, Ports[i])
+            arduinos[2].add_component("Input Module 3, pump 3")
             ves_in[2] = Vessel()
             pumps[2] = Pump(device, deviceID, 3, buffer)
         if deviceID=="1004":
-            arduinos[3] = Nano(device, deviceID)
-            arduinos[3].add_component("Pump 4, V1-V5")
+            arduinos[3] = Nano(device, deviceID, Ports[i])
+            arduinos[3].add_component("Ouput Module, pump 4, V1-V5")
             for i in range(5):
                 valves[i] = Valve(device, deviceID, i+1, buffer)
             for i in range(6):
@@ -196,21 +219,17 @@ def init_module():
             
             pumps[3] = Pump(device, deviceID, 4, buffer)
         if deviceID=="1005":
-            arduinos[4] = Nano(device, deviceID)
-            arduinos[4].add_component("shutter")
+            arduinos[4] = Nano(device, deviceID, Ports[i])
+            arduinos[4].add_component("Shutter Module")
             shutter = Shutter(device, deviceID, 1, buffer)
             mixer = Mixer(device, deviceID, 1, buffer)
-    
-    if not ID_array:
-        print("\nNo arduinos conected")
-    else: 
-        com.check_missing_dev(ID_array)
     
     for i in range(len(arduinos)):
         try:arduinos.remove(0)
         except:pass
     
-    Comps = com.Components()
+    buffer.phone = phone
+    buffer.arduinos = arduinos
     Comps.buffer = buffer
     Comps.arduinos = arduinos  #array
     Comps.ves_in = ves_in     #array
@@ -223,6 +242,16 @@ def init_module():
     Comps.Temp = [-1]
     Comps.Bubble = [-1]*3
     Comps.LDS = [-1]*4
+
+    if len(arduinos):
+        Comps.modules=[]
+        for arduino in arduinos:
+            Comps.modules.append("{}: {}\n".format(arduino.get_id(), arduino.get_components()))
+    else:
+        Comps.modules=['no modules found']
+
+    try:update_label(label, '\n'.join(Comps.modules)) 
+    except:pass
     print("\n------------ End initialisation --------------\n\n")
 
 
@@ -259,9 +288,9 @@ class Main(ctk.CTk):
     def __init__(self, *args, **kwargs):
         ctk.CTk.__init__(self, *args, **kwargs)
         ctk.CTk.wm_title(self, "ARCaDIUS")
-        self.geometry("900x500") 
+        self.geometry("1200x700") 
         self.minsize(700,400) 
-        container = ctk.CTkFrame(self, height=600, width=1024)
+        container = ctk.CTkFrame(self, height=700, width=1200)
         container.pack(side="top", fill = "both", expand = "true")
         container.grid_rowconfigure(0, weight= 1)
         container.grid_columnconfigure(0, weight= 1)
@@ -285,12 +314,38 @@ class Main(ctk.CTk):
         self.visible_frame = cont
 
     def connect_cam(self):
+        global cam
         vid = cv2.VideoCapture(1, cv2.CAP_DSHOW)
         if not vid.isOpened():
             vid = cv2.VideoCapture(0)
+        
         self.vid_frame_size = (int(vid.get(3)),int(vid.get(4)))
         self.vid = vid
+        cam = vid
+    
+    def get_cam_frame(self, label, resize=1.0):
+        try:
+            #only update camera if frame is raised.
+            _, frame = self.vid.read()
+            opencv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+            captured_image = Image.fromarray(opencv_image) #.transpose(Image.FLIP_LEFT_RIGHT)
+            photo_image = ctk.CTkImage(captured_image, size=(int(self.vid_frame_size[0]*resize),int(self.vid_frame_size[1]*resize)))
+            label.cv_image = frame
+            label.photo_image = photo_image
+            label.configure(image=photo_image)
+        except:
+            pass
 
+    def update_buffer_list(self, textbox):
+        prev_text = textbox.get("0.0", "end").strip()
+        commands = buffer.READ()
+        text = '\n'.join(commands).strip()
+        if (prev_text!=text):
+            textbox.configure(state= 'normal')
+            textbox.delete("0.0", "end")
+            textbox.insert("0.0", text)
+            textbox.configure(state= 'disabled')
+    
     def OpenNewWindow(self):
         OpenNewWindow()
 
@@ -301,34 +356,20 @@ class P_Init(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self, parent)
 
-        title = ctk.CTkLabel(self, text = "SETUP", font=Title_font)
+        title = ctk.CTkLabel(self, text = "SETUP", font=font_L)
         title.place(relx = 0.5, rely = 0.1, anchor = 'center')
-        
-        def update_devices():
-            init_module()
-            #refer to actual object returned if none= do not update label
-            if len(arduinos):
-                text = ""
-                for arduino in arduinos:
-                    text  += "arduino: '{}' : {}\n".format(arduino.get_id(), arduino.get_components())
-
-                update_label(details, text)
         
         frame1 = Frame(self, text = "Setup communcation")
         frame1.place(relx= 0.5, rely = 0.55, relwidth=0.9, relheight=0.8, anchor = 'center')
 
-        btn1 = btn(frame1, text="Initialise", command=lambda: update_devices(), width = 200, height=30, font = label_font)
-        btn1.place(relx = 0.5, rely = 0.2, anchor = 'center') 
-
-        ard_detail = "no arduino"
-        details = ctk.CTkLabel(frame1, font=label_font, text=ard_detail,justify= 'left')
+        details = ctk.CTkLabel(frame1, font=font_XS, text='\n'.join(Comps.modules),justify= 'left')
         details.place(relx = 0.5, rely = 0.5, anchor = 'center') 
 
-        btn2 = btn(frame1, text="FINISH", command=lambda: controller.show_frame(P_Home), width = 100, height=30, font = label_font)
+        btn2 = btn(frame1, text="Continue", command=lambda: controller.show_frame(P_Home), width = 100, height=30, font = font_S)
         btn2.place(relx = 0.5, rely = 0.9, anchor = 'center') 
 
-        update_devices()
-        
+        init_module(details)
+
 class P_Home(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self, parent)
@@ -343,7 +384,7 @@ class P_Home(ctk.CTkFrame):
         btn2=btn_img(frame1, "Automate", "auto.png", command=lambda: controller.show_frame(P_Auto))
         btn2.place(relx = 0.55, rely = 0.2,  anchor = 'w')
 
-        btn3=btn_img(frame1, "History", "book.png", command=lambda: controller.show_frame(P_Hist))
+        btn3=btn_img(frame1, "Task", "book.png", command=lambda: controller.show_frame(P_Hist))
         btn3.place(relx = 0.45, rely = 0.4, anchor = 'e')
 
         btn4=btn_img(frame1, "Iterate", "iter.png", command=lambda: controller.show_frame(P_Iter))
@@ -361,33 +402,62 @@ class P_Home(ctk.CTkFrame):
 class P_Param(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)
-        title = ctk.CTkLabel(self, text = "Parameters", font=Title_font)
+        title = ctk.CTkLabel(self, text = "Parameters", font=font_L)
         title.place(relx = 0.5, rely = 0.05, anchor = 'center')
-        frame1 = Frame(self, fg_color="transparent")
-        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+
+        tabs = MyTabView(self, pages = ["Module", "Interface"])
+        tabs.place(relx = 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+
+        frame_vessel = Frame(tabs.tab("Module"), text="Vessel levels")
+        frame_vessel.place(relx= 0.7, rely = 0.5, relwidth=0.3, relheight=0.4, anchor = 'center')
+
+        frame_nano = Frame(tabs.tab("Module"), text="Arduinos")
+        frame_nano.place(relx= 0.3, rely = 0.5, relwidth=0.3, relheight=0.4, anchor = 'center')
         
-        frame2 = Frame(frame1, text = 'Vessels')
-        frame2.place(relx= 0, rely = 0.5, relwidth=0.5, relheight=0.8, anchor = 'w')
+        frame_push = Frame(tabs.tab("Interface"), text="Push notification")
+        frame_push.place(relx= 0.5, rely = 0.5, relwidth=0.4, relheight=0.3, anchor = 'center')
+        #arduino
+        
+        details = ctk.CTkLabel(frame_nano, font=font_XS, text='\n'.join(Comps.modules),justify= 'left')
+        details.place(relx = 0.5, rely = 0.5, anchor = 'center') 
+        btn_flush = btn(frame_nano, text = 'reset', command=lambda: init_module(details))
+        btn_flush.place(relx=0.5, rely=0.1, anchor='center')
 
+        # interface
+        mode_switch = ctk.CTkSwitch(master=tabs.tab("Interface"), text="Dark Mode", command=lambda: set_mode(mode_switch.get()), onvalue=1, offvalue=0)
+        mode_switch.select()
+        mode_switch.place(relx=0.5, rely=0.1, anchor='center')
+        _, ent_app = place_2(0.3, *entry_block(frame_push, text='app token'), relx=0.27)
+        _, ent_user = place_2(0.6, *entry_block(frame_push, text='user key'), relx=0.27)
+        btn_save = btn(frame_push, 'save', command=lambda: phone.set_token(ent_app.get(), ent_user.get()))
+        btn_save.place(relx=0.5, rely= 0.9, anchor='center')
+        ent_app.configure(width=200)
+        ent_user.configure(width=200)
+        ent_app.insert(0, phone.app_token)
+        ent_user.insert(0, phone.user_key)
 
+        # vessels
         n = 3
         ent_Rname = [0]*n
         ent_Rvol = [0]*n
         names, volumes =  com.read_detail('details.csv')
         for i in range(n):
-            _, ent_Rname[i] = place_2(0.2 + 0.2*i, *entry_block(frame2, text=(str(i+1) + ': Name ')), relx = 0.25)
-            _, ent_Rvol[i]  = place_2(0.2 + 0.2*i, *entry_block(frame2, text=(' Vol: ')), relx = 0.75)
+            if i==0: text = 'A'
+            elif i==1: text = 'B'
+            elif i==2: text = 'C'
+            _, ent_Rname[i] = place_2(0.2 + 0.2*i, *entry_block(frame_vessel, text=text), relx = 0.25)
+            _, ent_Rvol[i]  = place_2(0.2 + 0.2*i, *entry_block(frame_vessel, text=(' Vol: ')), relx = 0.75)
            
             ent_Rname[i].insert(0,names[i])
             ent_Rvol[i].insert(0,volumes[i])
 
-        btn1 = btn(frame2, text ='save', command=lambda: com.vessel_detail(ent_Rname, ent_Rvol))
+        btn1 = btn(frame_vessel, text ='save', command=lambda: com.vessel_detail(ent_Rname, ent_Rvol))
         btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
 
 class P_Test(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)
-        title = ctk.CTkLabel(self, text = "Manual Control", font=Title_font)
+        title = ctk.CTkLabel(self, text = "Manual Control", font=font_L)
         title.place(relx = 0.5, rely = 0.05, anchor = 'center')
         
         frame1 = Frame(self, text = "Valve")
@@ -407,11 +477,11 @@ class P_Test(ctk.CTkFrame):
         #box 1 Valve
         _, ent_valve = place_2(0.2, *entry_block(frame1, "select valve: ", spin=True, from_=1, to=len(Comps.valves)))
 
-        btn1 = btn(frame1, text="close", command=lambda: Comps.valves[check_isnumber(ent_valve.get(), 'int')-1].close())
+        btn1 = btn(frame1, text="close", command=lambda: Comps.valves[int(ent_valve.get())-1].close())
         btn1.place(relx = 0.48, rely = 0.3, anchor = 'e')
-        btn2 = btn(frame1, text="open", command=lambda: Comps.valves[check_isnumber(ent_valve.get(), 'int')-1].open())
+        btn2 = btn(frame1, text="open", command=lambda: Comps.valves[int(ent_valve.get())-1].open())
         btn2.place(relx = 0.52, rely = 0.3, anchor = 'w')
-        btn3 = btn(frame1, text="mid", command=lambda: Comps.valves[check_isnumber(ent_valve.get(), 'int')-1].mid())
+        btn3 = btn(frame1, text="mid", command=lambda: Comps.valves[int(ent_valve.get())-1].mid())
         btn3.place(relx = 0.5, rely = 0.4, anchor = 'center')
 
         #box 1.2 Shutter
@@ -428,175 +498,226 @@ class P_Test(ctk.CTkFrame):
         _, ent_pump = place_2(0.2,*entry_block(frame2, "select pump: ", spin=True, from_=1, to=len(Comps.pumps)))
         _, ent_vol = place_2(0.3, *entry_block(frame2, "Volume (ml)"))
 
-        btn1 = btn(frame2, text="send", command=lambda: Comps.pumps[check_isnumber(ent_pump.get(), 'int')-1].pump(check_isnumber(ent_vol.get())))
+        btn1 = btn(frame2, text="send", command=lambda: Comps.pumps[int(ent_pump.get())-1].pump(float(ent_vol.get())))
         btn1.place(relx = 0.5, rely = 0.4, anchor = 'center')
 
         #box 3 mixer
         _, ent_mix = place_2(0.2, *entry_block(frame3, "speed : "))
-        btn1 = btn(frame3, text="send", command=lambda: Comps.mixer.mix(check_isnumber(ent_mix.get(), 'int')))
+        btn1 = btn(frame3, text="send", command=lambda: Comps.mixer.mix(int(ent_mix.get())))
         btn1.place(relx = 0.5, rely = 0.35, anchor = 'center')
 
 class P_Auto(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)
-        title = ctk.CTkLabel(self, text = "Automated MVP", font=Title_font)
+        title = ctk.CTkLabel(self, text = "Automated MVP", font=font_L)
         title.place(relx = 0.5, rely = 0.1, anchor = 'center')
 
         frame1 = Frame(self)
-        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
-        frame2 = Frame(frame1, text='inputs')
-        frame2.place(relx= 0.25, rely = 0.55, relwidth=0.45, relheight=0.8, anchor = 'center')
-        frame3 = Frame(frame1, text='output')
-        frame3.place(relx= 0.75, rely = 0.55, relwidth=0.45, relheight=0.8, anchor = 'center')
+        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.45, relheight=0.8, anchor = 'e')
+        frame2 = Frame(self, fg_color = 'transparent')
+        frame2.place(relx= 0.5, rely = 0.55, relwidth=0.45, relheight=0.8, anchor = 'w')
 
         ent_P = [0]*3
-        _, ent_P[0] = place_2(0.2, *entry_block(frame2, text="Reactant A"))
-        _, ent_P[1] = place_2(0.3, *entry_block(frame2, text="Reactant B"))
-        _, ent_P[2] = place_2(0.4, *entry_block(frame2, text="Reactant C"))
-
-        _, ent_I = place_2(0.5, *entry_block(frame2, text="Shutter time"))
+        _, ent_P[0] = place_2(0.2, *entry_block(frame1, text="Input A (ml)"))
+        _, ent_P[1] = place_2(0.3, *entry_block(frame1, text="Input B (ml)"))
+        _, ent_P[2] = place_2(0.4, *entry_block(frame1, text="Input C (ml)"))
+        _, ent_I = place_2(0.5, *entry_block(frame1, text="shutter time (s)"))
         
-        out_list = ["Product","Product 2", "Waste", "2 A", "2 B", "2 C"]
-        _, sel_output = place_2(0.2, *entry_block(frame3, text="Select", drop_list=out_list))
+        out_list = ["Input A", "Input B", "Product", "Waste", "Recycle", "Recycle 2"]
+        _, sel_output = place_2(0.6, *entry_block(frame1, text="Select Output", drop_list=out_list))
 
-        btn1 = btn(frame3, text="Start", command=lambda: experiment())
+        btn1 = btn(frame1, text="Start", width = 100, height=35, command=lambda: experiment(), font=font_S)
         btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
-        btn2 = btn(frame3, text="Wash", command=lambda: com.WASH(Comps)) 
-        btn2.place(relx = 0.5, rely = 0.9, anchor = 'center')
-
-
+        btn2 = btn(frame1, text="Wash", command=lambda: com.WASH(Comps)) 
+        btn2.place(relx = 0.8, rely = 0.8, anchor = 'center')
+        #progress bar
+        Pbar = ProgressBar(frame2, buffer)
         def experiment():
             tot_vol=0.0
             for i in range(len(ent_P)):
                 try:
-                    vol=check_isnumber(ent_P[i].get())
+                    vol=float(ent_P[i].get())
                     tot_vol+=vol
                     Comps.pumps[i].pump(vol)
                 except:pass
             try:
                 Comps.shutter.open()
-                try:Comps.buffer.BLOCK(check_isnumber(ent_I.get()))
-                except: pass
+                Comps.buffer.BLOCK(float(ent_I.get()))
                 Comps.shutter.close()
             except:pass
 
             try:
                 com.valve_states(Comps.valves, out_list.index(sel_output.get()))
-                Comps.pumps[3].pump(tot_vol)
+                Comps.pumps[3].pump(tot_vol+10)
             except:pass
+            buffer.NOTIFY('Experiment Over')
+            Pbar.SET(buffer.Left())
+       
+        # buffer list
+        textbox = ctk.CTkTextbox(frame2,width=300, height=200, state= 'normal')
+        textbox.place(relx=0.5, rely=0, anchor="n")
+        def update_buffer():
+            try:
+                if (controller.visible_frame==P_Auto):
+                    controller.update_buffer_list(textbox)
+                    Pbar.refresh()
+            except:
+                pass
+            textbox.after(500, update_buffer)
+        update_buffer()
+
+        #camera
+        label = ctk.CTkLabel(frame2, text="")
+        label.place(relx = 0.5, rely = 1, anchor = 's')
+        def update_cam():
+            try:
+                if (controller.visible_frame==P_Auto):
+                    controller.get_cam_frame(label, resize = 0.6)
+            except:
+                pass
+            label.after(50, update_cam)
+        update_cam()
 
 class P_Iter(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)
 
-        title = ctk.CTkLabel(self, text = "Iterative experiment", font=Title_font)
+        title = ctk.CTkLabel(self, text = "Iterative experiment", font=font_L)
         title.place(relx = 0.5, rely = 0.1, anchor = 'center')
 
-        frames = [0]*5
-        frames[0] = Frame(self, text = "Settings of experiments")
-        frames[0].place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
-        frames[1] = Frame(frames[0], text = "volume", fg_color= "transparent")
-        frames[1].place(relx= 0.75, rely = 0.05, relwidth=0.25, relheight=0.6, anchor = 'ne')
-        frames[2] = Frame(frames[0], text = "steps", fg_color= "transparent")
-        frames[2].place(relx= 0.75, rely = 0.05, relwidth=0.25, relheight=0.6, anchor = 'nw')
-        frames[3] = Frame(frames[0], text = "Send")
-        frames[3].place(relx= 0.75, rely = 0.65, relwidth=0.4, relheight=0.3, anchor = 'n')
+        frame1 = Frame(self, text= "setup experiment")
+        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.45, relheight=0.8, anchor = 'e')
+        frame2 = Frame(self, fg_color = 'transparent')
+        frame2.place(relx= 0.5, rely = 0.55, relwidth=0.45, relheight=0.8, anchor = 'w')    
 
-        def on_click(checkbutton_var, widgets, pos: int):
-            [lbl, ent_vol, lbls, ent_step] = widgets
-            if checkbutton_var.get() == 1:
-                place_2(pos, lbl, ent_vol)
-                place_2(pos, lbls, ent_step)
-            else:
-                for widget in widgets:
-                    widget.place_forget()
+        _, ent_volA = place_2(0.2, *entry_block(frame1, "A (ml):"), 0.4)
+        _, ent_stepA = place_2(0.2, *entry_block(frame1, " + it x", spin=True, from_=-20, wrap=False, increment = 0.1), 0.7)
+        ent_stepA.set(0)
+        _, ent_volB = place_2(0.3, *entry_block(frame1, "B (ml):"), 0.4)
+        _, ent_stepB = place_2(0.3, *entry_block(frame1, " + it x", spin=True, from_=-20, wrap=False, increment = 0.1), 0.7)
+        ent_stepB.set(0)
+        _, ent_volC = place_2(0.4, *entry_block(frame1, "C (ml):"), 0.4)
+        _, ent_stepC = place_2(0.4, *entry_block(frame1, " + it x", spin=True, from_=-20, wrap=False, increment = 0.1), 0.7)
+        ent_stepC.set(0)
+        _, ent_Shut= place_2(0.5, *entry_block(frame1, "shutter time:"), 0.4)
+        _, ent_step_Shut = place_2(0.5, *entry_block(frame1, " + it x", spin=True, wrap=False, from_=0), 0.7)
 
-            
-        lblA, ent_volA = entry_block(frames[1], "Liquid A:")
-        lblsA, ent_stepA = entry_block(frames[2], "step A:")
-        place_2(0.2, lblA, ent_volA)
-        place_2(0.2, lblsA, ent_stepA)
-        widgetsA = [lblA, ent_volA, lblsA, ent_stepA]
-
-        lblB, ent_volB = entry_block(frames[1],"Liquid B:")
-        lblsB, ent_stepB = entry_block(frames[2],"step B:")
-        widgetsB = [lblB, ent_volB, lblsB, ent_stepB]
+        _, ent_count = place_2(0.6, *entry_block(frame1, "number of iterations:", spin=True, from_=1, to=10))
         
-        lblcount, e_count = entry_block(frames[3], "iterations:",spin=True, from_=1)
-        place_2(0.2, lblcount, e_count)
-        btn1 = btn(frames[3], text="Start", command=lambda: send_command())
-        btn1.place(relx = 0.5, rely = 0.6, anchor='center') 
+        btn1 = btn(frame1, text="Start", width = 100, height=35, command=lambda: iterate(), font=font_S)
+        btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
 
-        checkbutton_var1 = tk.IntVar(value=1)
-        checkbutton= tk.Checkbutton(frames[0], text="Reactant A", variable=checkbutton_var1, command=lambda: on_click(checkbutton_var1, widgetsA, 0.2))
-        checkbutton.place(relx = 0.1, rely = 0.3, anchor='center') 
-        checkbutton_var2 = tk.IntVar()
-        checkbutton= tk.Checkbutton(frames[0], text="Reactant B", variable=checkbutton_var2, command=lambda: on_click(checkbutton_var2, widgetsB, 0.3))
-        checkbutton.place(relx = 0.1, rely = 0.4, anchor='center') 
+        #progress bar
+        Pbar = ProgressBar(frame2, buffer)
+       
+        # buffer list
+        textbox = ctk.CTkTextbox(frame2,width=300, height=200, state= 'normal')
+        textbox.place(relx=0.5, rely=0, anchor="n")
+        def update_buffer():
+            try:
+                if (controller.visible_frame==P_Iter):
+                    controller.update_buffer_list(textbox)
+                    Pbar.refresh()
+            except:
+                pass
+            textbox.after(500, update_buffer)
+        update_buffer()
 
-        def send_command():
-            Ra_ml_init = ent_volA.get()
+        #camera
+        label = ctk.CTkLabel(frame2, text="")
+        label.place(relx = 0.5, rely = 1, anchor = 's')
+        def update_cam():
+            try:
+                if (controller.visible_frame==P_Iter):
+                    controller.get_cam_frame(label, resize = 0.6)
+            except:
+                pass
+            label.after(50, update_cam)
+        update_cam()
+
+        def iterate():
+            Ra = ent_volA.get()
             Ra_step = ent_stepA.get()
-            Rb_ml_init = ent_volB.get()
+            Rb = ent_volB.get()
             Rb_step = ent_stepB.get()
-            count = int(e_count.get())
+            Rc = ent_volC.get()
+            Rc_step = ent_stepC.get()
+            time = ent_Shut.get()
+            time_step = ent_step_Shut.get()
+            count = int(ent_count.get())
 
             for i in range(count):
-                if Ra_ml_init!="" and Ra_step!="":
-                    Ra_ml = float(Ra_ml_init) + float(Ra_step)*i
-                    Comps.pumps[0].pump(Ra_ml)
-                if Rb_ml_init!="" and Rb_step!="":
-                    Rb_ml = float(Rb_ml_init) + float(Rb_step)*i
-                    Comps.pumps[1].pump(Rb_ml)
+                if Ra!="" and Ra_step!="":
+                    Comps.pumps[0].pump(float(Ra) + float(Ra_step)*i)
+                if Rb!="" and Rb_step!="":
+                    Comps.pumps[1].pump(float(Rb) + float(Rb_step)*i)
+                if Rc!="" and Rc_step!="":
+                    Comps.pumps[2].pump(float(Rc) + float(Rc_step)*i)
+                if time!="" and time_step!="":
+                    try:
+                        Comps.shutter.open()
+                        Comps.buffer.BLOCK(float(time)+float(time_step)*i)
+                        Comps.shutter.close()
+                    except:pass
+                try:
+                    com.valve_states(Comps.valves, 3)
+                    Comps.pumps[3].pump(10)
+                except:pass
 
-            return
-
+            Pbar.SET(buffer.Left())
+            buffer.NOTIFY('Iterations Over')
+      
 class P_Hist(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)     
 
-        title = ctk.CTkLabel(self, text = "History", font=Title_font)
+        title = ctk.CTkLabel(self, text = "Task", font=font_L)
         title.place(relx = 0.5, rely = 0.1, anchor = 'center') 
+
+        sub = ctk.CTkLabel(self, text = "Queue", font=font_M)
+        sub.place(relx = 0.2, rely = 0.1, anchor = 'center')
+
+        sub1 = ctk.CTkLabel(self, text = "History", font=font_M)
+        sub1.place(relx = 0.7, rely = 0.1, anchor = 'center')
 
         frame1 = Frame(self)
         frame1.place(relx= 0.95, rely = 0.55, relwidth=0.4, relheight=0.8, anchor = 'e')
 
-        frame2 = ctk.CTkScrollableFrame(self)
+        frame2 = Frame(self)
         frame2.place(relx= 0.05, rely = 0.55, relwidth=0.4, relheight=0.8, anchor = 'w')
+        frame2.grid_rowconfigure(0, weight=1)  # configure grid system
+        frame2.grid_columnconfigure(0, weight=1)
 
         scroll = ttk.Scrollbar(frame1, orient = "vertical")
         scroll.place(relx= 1, rely = 0.5, relwidth=0.03, relheight=1, anchor = 'e')
+
+        list = tk.Listbox(frame1, bd= 3, relief = "groove", selectmode= "SINGLE", yscrollcommand = scroll.set )
         
-        list = tk.Listbox(frame1, bd= 3, relief = "groove", selectmode= "SINGLE", yscrollcommand = scroll.set)
         list.place(relx= 0, rely = 0.5, relwidth=0.97, relheight=1, anchor = 'w')
         scroll.config(command = list.yview )
 
-        
-        btn1 = btn(self, text="clear all", command=lambda: buffer.RESET())
-        btn1.place(relx = 0.5, rely = 0.5, anchor = 'center')
-        btn2 = btn(self, text="skip next", command=lambda: buffer.POP())
-        btn2.place(relx = 0.5, rely = 0.4, anchor = 'center')
-        
-        frame2.label = ctk.CTkLabel(frame2)
-        frame2.label.grid(row=0, column=0, padx=20)
-        def update_buffer_list():
-            commands = buffer.READ()
-            text=''
-            for command in commands:
-                text += command+'\n'
-            frame2.label.configure(text=text, font = label_font, anchor= 'w')
-            frame2.label.after(500, update_buffer_list)
-            
-        update_buffer_list()
+        btn1 = btn(self, text="skip next", command=lambda: buffer.POP())
+        btn1.place(relx = 0.5, rely = 0.4, anchor = 'center')
+        btn2 = btn(self, text="skip last", command=lambda: buffer.POP_LAST())
+        btn2.place(relx = 0.5, rely = 0.5, anchor = 'center')
+        btn3 = btn(self, text="Clear Queue", command=lambda: buffer.RESET())
+        btn3.place(relx = 0.5, rely = 0.6, anchor = 'center')
 
-        def update_history():
+        textbox = ctk.CTkTextbox(frame2, state= 'normal')
+        textbox.grid(row=0, column=0, sticky="nsew")
+        def update_page():
+            try:
+                if (controller.visible_frame==P_Hist):
+                    controller.update_buffer_list(textbox)                   
+            except:
+                pass
+            # update history
             list.delete(0, 'end') #clear the list before updating
             time, command = com.read_detail("commands.csv")
             for x in range(len(time)):
-                list.insert(0, time[x] + "   " + command[x])  # 0 for printing from last to first and 'end' for printing 1st to last
-            list.after(500, update_history)
-
-        update_history()
+                list.insert(0, time[x] + "   " + command[x])
+            textbox.after(500, update_page)
+        update_page()
 
 class P_Cam(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -604,23 +725,17 @@ class P_Cam(ctk.CTkFrame):
         
         label = ctk.CTkLabel(self, text="")
         label.place(relx = 0.5, rely = 0.5, anchor = 'center')
+    
 
         def update_cam():
-            try:
+            try: 
                 if (controller.visible_frame==P_Cam):
-                    #only update camera if frame is raised.
-                    _, frame = controller.vid.read()
-                    
-                    opencv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
-                    captured_image = Image.fromarray(opencv_image) #.transpose(Image.FLIP_LEFT_RIGHT)
-                    photo_image = ctk.CTkImage(captured_image, size=controller.vid_frame_size)
-                    label.photo_image = photo_image
-                    label.configure(image=photo_image)
+                    controller.get_cam_frame(label)
             except:
                 pass
             label.after(50, update_cam)
         update_cam()
-        
+ 
 class OpenNewWindow(tk.Tk):
     def __init__(self, *args, **kwargs):
 
@@ -646,13 +761,13 @@ def Event(MESSAGES):
     for MESSAGE in MESSAGES:
         match MESSAGE[5]:
             case "E":
-                pass
+                com.Log("ERROR: wrong command sent")
 
             case "V":
+                print("validated: ")
                 arduinos[0].busy()
                 command = buffer.POP()
-                com.DECODE_LINE(command, Comps)
-                com.Log(command)
+                com.Log(com.DECODE_LINE(command, Comps))
 
             case "F":
                 arduinos[0].free()
@@ -664,10 +779,10 @@ def Event(MESSAGES):
 def task():
     global device
     if len(arduinos):
-        if (arduinos[0].state==False) and (buffer.LENGTH()>0):
-            buffer.OUT(arduinos)
-            if not buffer.blocked:
-                device,_ = buffer.READ()[0]
+        if (arduinos[0].state==False) and (buffer.Left()>0):
+            buffer.OUT()
+            if not buffer.blocked and (buffer.Left()>0):
+                device = buffer.READ_DEVICE()
                 arduinos[0].busy()
         try:
             if (device.inWaiting() > 0):
@@ -677,7 +792,64 @@ def task():
     gui.after(200, task)
     time.sleep(0.01)
 
+
+def Web_Camera():
+    global cam
+    _, frame = cam.read()
+    try:
+        Frames.put(frame, block=False)
+    except:
+        pass
+    gui.after(190,Web_Camera)
+    
+app = Flask(__name__)
+@app.route("/")
+def Main_page():
+    template = {
+        'title': 'Arcadius Monitoring Page',
+    }
+    return render_template('Main.html', **template)
+
+global web_frame
+def gen_frames():
+    while True:
+        try:
+            frame = web_frame.get(block=False)
+            try:   
+                ret, buffer = cv2.imencode('.jpg', frame)
+                frame = buffer.tobytes()
+                yield (b'--frame\r\n'
+                        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
+            except:
+                pass
+        except:
+            pass
+        time.sleep(0.1)
+            
+@app.route('/video_feed')
+def video_feed():
+    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
 #GUI
-gui = Main()
-gui.after(100,task)
-gui.mainloop()
+def GUI():
+    global gui
+    gui = Main()
+    gui.after(100,task)
+    gui.after(200,Web_Camera)
+    gui.mainloop()
+
+def Server(Q):
+    global app, web_frame
+    web_frame = Q
+    if __name__ == '__mp_main__':
+        app.run(host='0.0.0.0', port = 80)
+
+if __name__ == "__main__":
+    Frames = multiprocessing.Queue()
+    List_commands = multiprocessing.Queue()
+    server = multiprocessing.Process(target = Server, args=(Frames,))
+    server.start()
+    GUI()
+    server.terminate()
+    server.join()
+    

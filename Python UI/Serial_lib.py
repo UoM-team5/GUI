@@ -10,10 +10,19 @@ def ID_PORTS_AVAILABLE():
             s = serial.Serial(port)
             s.close()
             devices.append(port)
+            print('port found: ', port)
         except (OSError, serial.SerialException):
             pass
     
     return devices
+
+def CLOSE_SERIAL_PORT(arduinos):
+    try:
+        for arduino in arduinos:
+            arduino.device.close()
+            print('arduino closed ', arduino.device)
+    except:
+        pass
 
 def OPEN_SERIAL_PORT(DEV):
     try:
@@ -123,10 +132,9 @@ def DECODE_PACKAGE(senderID, PK, Comps):
         #multi package commands 
         match operator[0]:
             case "P":
-                #Pump: [sID... rID PK3 P1 m10.2 D1]
+                #Pump: [sID... rID PK3 P1 m10.2]
                 num = int(pk_split[1][1])
                 vol = float(pk_split[2][1:])
-                dir = int(pk_split[3][1])
                 if num==(1 or 2 or 3):
                     try: 
                         Comps.ves_in[num-1].sub(float(vol))
@@ -136,28 +144,28 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                 if num==4:
                     Comps.ves_main.sub(float(vol))
                     Comps.ves_out[Comps.valves.output_vessel].add(float(vol))
-                return num, vol
+                return "Pump {}: volume {} ".format(num, vol)
             
             case "V":
                 #Valve: [sID... rID PK2 V1 S]
                 num = pk_split[1][1]
                 state = pk_split[2][1]
                 print("Valve num {}, state {} ".format(num, state))
-                return num,state
+                return "Valve {}: state {} ".format(num, state)
             
             case "I":
                 #Shutter: [sID... rID PK2 V1 S]
                 num = pk_split[1][1]
                 state = pk_split[2][1]
-                print("Shutter num {}, state {} ".format(num, state))
-                return num,state
+                print("Shutter state {} ".format(state))
+                return "Shutter state {} ".format(state)
             
             case "M":
                 #mixer
                 num = pk_split[1][1]
                 state = pk_split[2][1]
                 print("Mixer num {}, state {} ".format(num, state))
-                return num,state
+                return "Mixer state {}".format(state)
             
             case "S": 
                 out += " sensors "
@@ -431,15 +439,18 @@ class Vessel:
         return self.name
 
 class Components:
+    def __init__(self):
+        self.modules = ['no arduino connected']
     pass
     
 class Nano:
     state = False
-    def __init__(self, device, ID):
+    def __init__(self, device, ID, port=''):
         self.device = device
         self.ID = ID
         self.components = ""
         self.message = ""
+        self.port=port
 
     def get_id(self):
         #print(self.ID)
@@ -504,9 +515,8 @@ class Buffer:
             
     def POP(self):
         if len(self.buffer):
-            print("POP")
+            print("pop")
             device, command = self.buffer.pop(0)
-            print(command)
             return command
     
     def POP_LAST(self):
