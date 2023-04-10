@@ -844,12 +844,12 @@ def Main_page():
         'N4' : Next[3]
     }
     if request.method == 'POST':
-            if request.form.get('Encrypt') == 'Encrypt':
-                # pass
-                print("Encrypted")
-            elif  request.form.get('Decrypt') == 'Decrypt':
+            if request.form.get('Kill') == 'Kill':
+                # Need to come up with a way of killing all
+                print("Kill")
+            elif  request.form.get('bar') == 'foo':
                 # pass # do something else
-                print("Decrypted")
+                print("foo bar")
             else:
                 # pass # unknown
                 return render_template('Main.html', **template)
@@ -857,7 +857,6 @@ def Main_page():
         # return render_template("index.html")
         print("No Post Back Call")
     return render_template('Main.html', **template)
-
 
 def gen_frames():
     while True:
@@ -872,8 +871,7 @@ def gen_frames():
                 pass
         except:
             pass
-
-            
+           
 @app.route('/video_feed')
 def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
