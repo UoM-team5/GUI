@@ -4,9 +4,12 @@ from PIL import Image
 import customtkinter as ctk
 import Serial_lib as com 
 from Serial_lib import Pump, Valve, Shutter, Mixer, Vessel, Nano 
-import os, cv2, time, multiprocessing
-from flask import Flask, render_template, Response
+import os, cv2, time, multiprocessing, random
+from flask import Flask, render_template, Response, request
 from chump import Application
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 #pyinstaller --onedir -w --add-data "c:\users\idan\appdata\local\programs\python\python310\lib\site-packages\customtkinter;customtkinter\" UI.py
 # UI styles 
@@ -789,9 +792,25 @@ def task():
                 Event(com.READ(device))
         except:
             pass
+
+    #To simulate getting commands this will be replaced with actual ones
+    temp_list = []
+    for i in range(0,10):
+        temp_list.append(random.randint(0,10))
+    try:
+        Current_cmd.put(temp_list[0], block=False)
+    except:
+        pass
+    for i in range(1,5):
+        try:
+            Next_cmd.put(temp_list[i], block=False)
+        except:
+            pass
+
     gui.after(200, task)
     time.sleep(0.01)
 
+global web_frame, C_CMD, N_CMD
 
 def Web_Camera():
     global cam
@@ -800,17 +819,46 @@ def Web_Camera():
         Frames.put(frame, block=False)
     except:
         pass
-    gui.after(101,Web_Camera)
-    
+    gui.after(200,Web_Camera)
+
 app = Flask(__name__)
-@app.route("/")
+@app.route("/", methods=['GET', 'POST'])
 def Main_page():
+    Next =[]
+    for i in range(0, 4):
+        try: 
+            Next.append(N_CMD.get(block = False))
+        except: 
+            Next.append("0")
+
+    try: 
+        Current = C_CMD.get(block = False) 
+    except: 
+        Current = "0"
     template = {
         'title': 'Arcadius Monitoring Page',
+        'Next' : Next[0],
+        'Current' : Current,
+        'N2' : Next[1],
+        'N3' : Next[2],
+        'N4' : Next[3]
     }
+    if request.method == 'POST':
+            if request.form.get('Encrypt') == 'Encrypt':
+                # pass
+                print("Encrypted")
+            elif  request.form.get('Decrypt') == 'Decrypt':
+                # pass # do something else
+                print("Decrypted")
+            else:
+                # pass # unknown
+                return render_template('Main.html', **template)
+    elif request.method == 'GET':
+        # return render_template("index.html")
+        print("No Post Back Call")
     return render_template('Main.html', **template)
 
-global web_frame
+
 def gen_frames():
     while True:
         try:
@@ -835,19 +883,22 @@ def GUI():
     global gui
     gui = Main()
     gui.after(100,task)
-    gui.after(101,Web_Camera)
+    gui.after(200,Web_Camera)
     gui.mainloop()
 
-def Server(Q):
-    global app, web_frame
+def Server(Q, L, N):
+    global app, web_frame, C_CMD, N_CMD
     web_frame = Q
+    C_CMD = L
+    N_CMD = N
     if __name__ == '__mp_main__':
         app.run(host='0.0.0.0', port = 80)
 
 if __name__ == "__main__":
-    Frames = multiprocessing.Queue()
-    List_commands = multiprocessing.Queue()
-    server = multiprocessing.Process(target = Server, args=(Frames,))
+    Frames = multiprocessing.Queue(5)
+    Current_cmd = multiprocessing.Queue(1)
+    Next_cmd = multiprocessing.Queue(4)
+    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd))
     server.start()
     GUI()
     server.terminate()

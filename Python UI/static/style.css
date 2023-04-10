@@ -38,3 +38,23 @@ Control{
 	background-color: #f1f1f1;
 	height: 50%;
 }
+
+table {
+	font-family: arial, sans-serif;
+	border-collapse: collapse;
+	width: 100%;
+	align-self: center;
+}
+
+td,
+th {
+	border: 1px solid #3232327e;
+	text-align: center;
+	width: 50%;
+	padding: 8px;
+	font-size: 20px;
+}
+
+tr:nth-child(even) {
+	background-color: #dddddd;
+}

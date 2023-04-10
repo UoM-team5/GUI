@@ -2,29 +2,59 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-	<head>
-		<title>
-			{{title}}
-		</title>
-		<header>
-			<img src="../static/arcadius.png" alt="logo" style="width: 30%;">
-			<br>System Monitor
-		</header>
-		<section>
-			<Image_stream>
-			  <h1>
+
+<head>
+	<title>
+		{{title}}
+	</title>
+	<header>
+		<img src="../static/arcadius.png" alt="logo" style="width: 30%;">
+		<br>System Monitor
+	</header>
+	<section>
+		<Image_stream>
+			<h1>
 				Camera feed
-			  </h1>
-			  <img id = "stream" src="{{ url_for('video_feed') }}" alt="view" style="height:80%;width:80%">
-			</Image_stream>
+			</h1>
+			<img id="stream" src="{{ url_for('video_feed') }}" alt="view" style="height:80%;width:80%">
+		</Image_stream>
 
-			<Control>
-			  <h1>Process Monitoring</h1>
-			  <p>This is where process monitor will go</p>
-			</Control>
-		  </section>
+		<Control>
+			<h1>Process Monitoring</h1>
+			<table>
+				<tr>
+					<th>Current Command</th>
+					<th>Next Command</th>
+				</tr>
+				<tr>
+					<td>{{Current}}</td>
+					<td>{{Next}}</td>
+				</tr>
+				<tr>
+					<td> </td>
+					<td>{{N2}}</td>
+				</tr>
+				<tr>
+					<td> </td>
+					<td>{{N3}}</td>
+				</tr>
+				<tr>
+					<td> </td>
+					<td>{{N4}}</td>
+				</tr>
+		</Control>
+	</section>
 
-		<link rel="stylesheet" href="../static/style.css/">
-	
-	</head>
+	<form method="post" action="/">
+
+		<input type="submit" value="Encrypt" name="Encrypt" />
+		<input type="submit" value="Decrypt" name="Decrypt" />
+
+	</form>
+
+	<link rel="stylesheet" href="../static/style.css/">
+	<meta http-equiv="refresh" content="10">
+
+</head>
+
 </html>
