@@ -800,7 +800,7 @@ def Web_Camera():
         Frames.put(frame, block=False)
     except:
         pass
-    gui.after(190,Web_Camera)
+    gui.after(101,Web_Camera)
     
 app = Flask(__name__)
 @app.route("/")
@@ -824,7 +824,7 @@ def gen_frames():
                 pass
         except:
             pass
-        time.sleep(0.1)
+
             
 @app.route('/video_feed')
 def video_feed():
@@ -835,7 +835,7 @@ def GUI():
     global gui
     gui = Main()
     gui.after(100,task)
-    gui.after(200,Web_Camera)
+    gui.after(101,Web_Camera)
     gui.mainloop()
 
 def Server(Q):
