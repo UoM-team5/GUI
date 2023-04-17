@@ -810,7 +810,7 @@ def task():
     gui.after(200, task)
     time.sleep(0.01)
 
-global web_frame, C_CMD, N_CMD
+global web_frame, C_CMD, N_CMD, Kill_Conn
 
 def Web_Camera():
     global cam
@@ -821,6 +821,13 @@ def Web_Camera():
         pass
     gui.after(200,Web_Camera)
 
+def kill_check():
+    if Kill_rev.poll(timeout=0.1):
+        if Kill_rev.recv() == "kill":
+            print("this is a kill command")
+            gui.Quit_application()
+    gui.after(100,kill_check)
+
 app = Flask(__name__)
 @app.route("/", methods=['GET', 'POST'])
 def Main_page():
@@ -830,7 +837,6 @@ def Main_page():
             Next.append(N_CMD.get(block = False))
         except: 
             Next.append("0")
-
     try: 
         Current = C_CMD.get(block = False) 
     except: 
@@ -844,15 +850,17 @@ def Main_page():
         'N4' : Next[3]
     }
     if request.method == 'POST':
-            if request.form.get('Kill') == 'Kill':
-                # Need to come up with a way of killing all
-                print("Kill")
-            elif  request.form.get('bar') == 'foo':
+            
+            if  request.form.get('bar') == 'foo':
                 # pass # do something else
                 print("foo bar")
+            elif request.form.get('Kill') == 'Kill':
+                # Need to come up with a way of killing all
+                print("Kill")
+                Kill_Conn.send("kill")
             else:
                 # pass # unknown
-                return render_template('Main.html', **template)
+                pass
     elif request.method == 'GET':
         # return render_template("index.html")
         print("No Post Back Call")
@@ -876,19 +884,38 @@ def gen_frames():
 def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+@app.route('/control')
+def control_page():
+    if request.method == 'POST':
+            if request.form.get('Kill') == 'Kill':
+                # Need to come up with a way of killing all
+                print("Kill")
+                Kill_Conn.send("kill")
+            elif  request.form.get('bar') == 'foo':
+                # pass # do something else
+                print("foo bar")
+            else:
+                # pass # unknown
+                pass
+    elif request.method == 'GET':
+        # return render_template("index.html")
+        print("No Post Back Call")
+    return render_template('control.html')
 #GUI
 def GUI():
     global gui
     gui = Main()
     gui.after(100,task)
     gui.after(200,Web_Camera)
+    gui.after(100,kill_check)
     gui.mainloop()
 
-def Server(Q, L, N):
-    global app, web_frame, C_CMD, N_CMD
+def Server(Q, L, N, K):
+    global app, web_frame, C_CMD, N_CMD, Kill_Conn
     web_frame = Q
     C_CMD = L
     N_CMD = N
+    Kill_Conn = K
     if __name__ == '__mp_main__':
         app.run(host='0.0.0.0', port = 80)
 
@@ -896,7 +923,8 @@ if __name__ == "__main__":
     Frames = multiprocessing.Queue(5)
     Current_cmd = multiprocessing.Queue(1)
     Next_cmd = multiprocessing.Queue(4)
-    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd))
+    Kill_rev, Kill_send = multiprocessing.Pipe(duplex = False)
+    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send))
     server.start()
     GUI()
     server.terminate()
