@@ -957,6 +957,7 @@ if __name__ == "__main__":
     server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, Pump_send))
     server.start()
     GUI()
+    
     server.terminate()
     server.join()
     
