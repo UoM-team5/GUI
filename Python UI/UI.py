@@ -874,7 +874,7 @@ def Main_page():
                 pass
     elif request.method == 'GET':
         print("No Post Back Call")
-    return render_template('Main.html', **template) #Renders webpage
+    return render_template('Main.html', **template) #Renders webpage 
 
 # generates videofeed from frame queue
 def gen_frames(): 
