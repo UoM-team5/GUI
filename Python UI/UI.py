@@ -808,7 +808,6 @@ def task():
         except:
             pass
     #-------- end ----------#
-
     gui.after(200, task)
     time.sleep(0.01)
 
