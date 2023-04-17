@@ -826,10 +826,6 @@ def Web_Camera():
         Frames.put(frame, block=False)# puts frame on queue, only stores the last 5 frames
     except:
         pass
-    gui.after(200,Web_Camera) # executes it every 200ms 
-
-# Checks for a kill command from the webpage and kills all processes
-def kill_check(): 
     if Kill_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
         if Kill_rev.recv() == "kill": # if the command is kill
             print("this is a kill command")
@@ -838,7 +834,10 @@ def kill_check():
         if Pump_rev.recv() == "PUMP": # if the command is kill
             print("this is a Pump command")
             Comps.pumps[0].pump(5)
-    gui.after(200,kill_check) # checks pipe every 100ms
+        if Pump_rev() == "Shutter":
+            print("This is a shutter command")
+            Comps.shutter.open()
+    gui.after(200,Web_Camera) # executes it every 200ms 
 
 app = Flask(__name__) #main web application
 
@@ -877,6 +876,9 @@ def Main_page():
             elif  request.form.get('Pump') == 'Pump':
                 print("Pump")
                 Pump_Conn.send("PUMP")
+            elif  request.form.get('Shutter') == 'Shutter':
+                print("Shutter")
+                Pump_Conn.send("Shutter")
             else:
                 pass
     elif request.method == 'GET':
@@ -924,7 +926,6 @@ def GUI():
     gui = Main()
     gui.after(100,task)
     gui.after(200,Web_Camera)
-    gui.after(100,kill_check)
     gui.mainloop()
 
 #------- Webserver Thread ----------#
