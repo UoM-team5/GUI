@@ -816,7 +816,7 @@ def task():
 
 #Global 
 # Queues and pipes to share and communicate between threads
-global web_frame, C_CMD, N_CMD, Kill_Conn
+global web_frame, C_CMD, N_CMD, Kill_Conn, Pump_Conn
 
 # Grabs the latest frame and puts it onto a Queue for the webpage to read and display
 def Web_Camera():
@@ -835,6 +835,15 @@ def kill_check():
             print("this is a kill command")
             gui.Quit_application() # Quits all applications
     gui.after(100,kill_check) # checks pipe every 100ms
+
+
+def Pump_check(): 
+    if Pump_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
+        if Pump_rev.recv() == "PUMP": # if the command is kill
+            print("this is a Pump command")
+            Comps.pumps[0].pump(5)
+    gui.after(100,Pump_check) # checks pipe every 100ms
+
 
 app = Flask(__name__) #main web application
 
@@ -870,6 +879,9 @@ def Main_page():
             elif request.form.get('Screenshot') == 'SS':
                 print("capture screen")
                 cv2.imwrite()
+            elif  request.form.get('Pump') == 'Pump':
+                print("Pump")
+                Pump_Conn.send("PUMP")
             else:
                 pass
     elif request.method == 'GET':
@@ -897,13 +909,14 @@ def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 #New control page
-@app.route('/control')
+@app.route('/control', methods=['GET', 'POST'])
 def control_page():
     if request.method == 'POST':
             if request.form.get('Kill') == 'Kill':
                 Kill_Conn.send("kill")
-            elif  request.form.get('bar') == 'foo':
-                print("foo bar")
+            elif  request.form.get('Pump') == 'Pump':
+                print("Pump")
+                Pump_Conn.send("PUMP")
             else:
                 pass
     elif request.method == 'GET':
@@ -917,15 +930,17 @@ def GUI():
     gui.after(100,task)
     gui.after(200,Web_Camera)
     gui.after(100,kill_check)
+    gui.after(100,Pump_check)
     gui.mainloop()
 
 #------- Webserver Thread ----------#
-def Server(Q, L, N, K):
-    global app, web_frame, C_CMD, N_CMD, Kill_Conn
+def Server(Q, L, N, K, P):
+    global app, web_frame, C_CMD, N_CMD, Kill_Conn, Pump_Conn
     web_frame = Q
     C_CMD = L
     N_CMD = N
     Kill_Conn = K
+    Pump_Conn = P
     if __name__ == '__mp_main__':
         app.run(host='0.0.0.0', port = 80)
 
@@ -935,7 +950,8 @@ if __name__ == "__main__":
     Current_cmd = multiprocessing.Queue(1)
     Next_cmd = multiprocessing.Queue(4)
     Kill_rev, Kill_send = multiprocessing.Pipe(duplex = False)
-    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send))
+    Pump_rev, Pump_send = multiprocessing.Pipe(duplex = False)
+    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, Pump_send))
     server.start()
     GUI()
     server.terminate()
