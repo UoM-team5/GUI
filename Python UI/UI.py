@@ -834,7 +834,7 @@ def kill_check():
         if Kill_rev.recv() == "kill": # if the command is kill
             print("this is a kill command")
             gui.Quit_application() # Quits all applications
-    gui.after(100,kill_check) # checks pipe every 100ms
+    gui.after(500,kill_check) # checks pipe every 100ms
 
 
 def Pump_check(): 
@@ -842,7 +842,7 @@ def Pump_check():
         if Pump_rev.recv() == "PUMP": # if the command is kill
             print("this is a Pump command")
             Comps.pumps[0].pump(5)
-    gui.after(100,Pump_check) # checks pipe every 100ms
+    gui.after(500,Pump_check) # checks pipe every 100ms
 
 
 app = Flask(__name__) #main web application
