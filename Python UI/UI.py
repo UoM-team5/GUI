@@ -831,10 +831,11 @@ def Web_Camera():
             print("this is a kill command")
             gui.Quit_application() # Quits all applications
     if Pump_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
-        if Pump_rev.recv() == "PUMP": # if the command is kill
+        command = Pump_rev.recv()
+        if command == "PUMP": # if the command is kill
             print("this is a Pump command")
             Comps.pumps[0].pump(5)
-        if Pump_rev() == "Shutter":
+        if command == "Shutter":
             print("This is a shutter command")
             Comps.shutter.open()
     gui.after(200,Web_Camera) # executes it every 200ms 
