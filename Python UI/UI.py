@@ -834,16 +834,11 @@ def kill_check():
         if Kill_rev.recv() == "kill": # if the command is kill
             print("this is a kill command")
             gui.Quit_application() # Quits all applications
-    gui.after(500,kill_check) # checks pipe every 100ms
-
-
-def Pump_check(): 
     if Pump_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
         if Pump_rev.recv() == "PUMP": # if the command is kill
             print("this is a Pump command")
             Comps.pumps[0].pump(5)
-    gui.after(500,Pump_check) # checks pipe every 100ms
-
+    gui.after(200,kill_check) # checks pipe every 100ms
 
 app = Flask(__name__) #main web application
 
@@ -930,7 +925,6 @@ def GUI():
     gui.after(100,task)
     gui.after(200,Web_Camera)
     gui.after(100,kill_check)
-    gui.after(100,Pump_check)
     gui.mainloop()
 
 #------- Webserver Thread ----------#
