@@ -891,10 +891,10 @@ def gen_frames():
         try:
             frame = web_frame.get(block=False) # gets the most recent frames
             try:   
-                ret, buffer = cv2.imencode('.jpg', frame) #encodes the frame and stores it in a buffer
+                ret, buffer = cv2.imencode('.jpg', frame) # encodes the frame and stores it in a buffer
                 frame = buffer.tobytes() # converts to bytes
                 yield (b'--frame\r\n'
-                        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
+                        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  #Concat frame one by one and show result
             except:
                 pass
         except:
