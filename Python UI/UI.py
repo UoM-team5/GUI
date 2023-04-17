@@ -430,6 +430,12 @@ class P_Param(ctk.CTkFrame):
         mode_switch = ctk.CTkSwitch(master=tabs.tab("Interface"), text="Dark Mode", command=lambda: set_mode(mode_switch.get()), onvalue=1, offvalue=0)
         mode_switch.select()
         mode_switch.place(relx=0.5, rely=0.1, anchor='center')
+
+        global rem_control
+        rem_control = ctk.CTkSwitch(master=tabs.tab("Interface"), text="Remote control", onvalue=1, offvalue=0)
+        rem_control.select()
+        rem_control.place(relx=0.5, rely=0.3, anchor='center')
+
         _, ent_app = place_2(0.3, *entry_block(frame_push, text='app token'), relx=0.27)
         _, ent_user = place_2(0.6, *entry_block(frame_push, text='user key'), relx=0.27)
         btn_save = btn(frame_push, 'save', command=lambda: phone.set_token(ent_app.get(), ent_user.get()))
@@ -829,7 +835,7 @@ def Web_Camera():
         if Kill_rev.recv() == "kill": # if the command is kill
             print("this is a kill command")
             gui.Quit_application() # Quits all applications
-    if Pump_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
+    if rem_control.get() and Pump_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
         command = Pump_rev.recv()
         if command == "PUMP": # if the command is kill
             print("this is a Pump command")
@@ -837,6 +843,8 @@ def Web_Camera():
         if command == "Shutter":
             print("This is a shutter command")
             Comps.shutter.open()
+    elif Pump_rev.poll(timeout=0.1):
+        Pump_rev.recv()
     gui.after(200,Web_Camera) # executes it every 200ms 
 
 app = Flask(__name__) #main web application
