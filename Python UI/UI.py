@@ -794,6 +794,7 @@ def task():
             pass
 
     #To simulate getting commands this will be replaced with actual ones
+    #------- start ----------#
     temp_list = []
     for i in range(0,10):
         temp_list.append(random.randint(0,10))
@@ -806,73 +807,80 @@ def task():
             Next_cmd.put(temp_list[i], block=False)
         except:
             pass
+    #-------- end ----------#
 
     gui.after(200, task)
     time.sleep(0.01)
 
+#---------- Webpage Commands ---------------#
+
+#Global 
+# Queues and pipes to share and communicate between threads
 global web_frame, C_CMD, N_CMD, Kill_Conn
 
+# Grabs the latest frame and puts it onto a Queue for the webpage to read and display
 def Web_Camera():
     global cam
-    _, frame = cam.read()
+    _, frame = cam.read() # reusing GUI cam instance
     try:
-        Frames.put(frame, block=False)
+        Frames.put(frame, block=False)# puts frame on queue, only stores the last 5 frames
     except:
         pass
-    gui.after(200,Web_Camera)
+    gui.after(200,Web_Camera) # executes it every 200ms 
 
-def kill_check():
-    if Kill_rev.poll(timeout=0.1):
-        if Kill_rev.recv() == "kill":
+# Checks for a kill command from the webpage and kills all processes
+def kill_check(): 
+    if Kill_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
+        if Kill_rev.recv() == "kill": # if the command is kill
             print("this is a kill command")
-            gui.Quit_application()
-    gui.after(100,kill_check)
+            gui.Quit_application() # Quits all applications
+    gui.after(100,kill_check) # checks pipe every 100ms
 
-app = Flask(__name__)
-@app.route("/", methods=['GET', 'POST'])
+app = Flask(__name__) #main web application
+
+#main page of the website
+@app.route("/", methods=['GET', 'POST']) # methods of interating and route address
 def Main_page():
-    Next =[]
+    # Reads all the current commands in the buffer and addes N/A if blank
+    Next =[] # list of next 4 commands
     for i in range(0, 4):
         try: 
-            Next.append(N_CMD.get(block = False))
+            Next.append(N_CMD.get(block = False)) # reads queue and adds commands to the list.
         except: 
-            Next.append("0")
+            Next.append("N/A") # N/A if it is not available
     try: 
-        Current = C_CMD.get(block = False) 
+        Current = C_CMD.get(block = False) #Reads current command 
     except: 
-        Current = "0"
+        Current = "N/A"
+
+    #To edit the webpage HTML file with the python data
     template = {
         'title': 'Arcadius Monitoring Page',
-        'Next' : Next[0],
         'Current' : Current,
+        'N1' : Next[0], #the next 4 commands
         'N2' : Next[1],
         'N3' : Next[2],
         'N4' : Next[3]
     }
+    
+    # Gets the request form the webpage about button presses
     if request.method == 'POST':
-            
-            if  request.form.get('bar') == 'foo':
-                # pass # do something else
-                print("foo bar")
-            elif request.form.get('Kill') == 'Kill':
-                # Need to come up with a way of killing all
-                print("Kill")
-                Kill_Conn.send("kill")
+            if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
+                Kill_Conn.send("kill") # Sends kill command on kill pipe
             else:
-                # pass # unknown
                 pass
     elif request.method == 'GET':
-        # return render_template("index.html")
         print("No Post Back Call")
-    return render_template('Main.html', **template)
+    return render_template('Main.html', **template) #Renders webpage
 
-def gen_frames():
+# generates videofeed from frame queue
+def gen_frames(): 
     while True:
         try:
-            frame = web_frame.get(block=False)
+            frame = web_frame.get(block=False) # gets the most recent frames
             try:   
-                ret, buffer = cv2.imencode('.jpg', frame)
-                frame = buffer.tobytes()
+                ret, buffer = cv2.imencode('.jpg', frame) #encodes the frame and stores it in a buffer
+                frame = buffer.tobytes() # converts to bytes
                 yield (b'--frame\r\n'
                         b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
             except:
@@ -880,28 +888,26 @@ def gen_frames():
         except:
             pass
            
+#Renders a webpage fro pure video streaming which is linked to on main page
 @app.route('/video_feed')
 def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+#New control page
 @app.route('/control')
 def control_page():
     if request.method == 'POST':
             if request.form.get('Kill') == 'Kill':
-                # Need to come up with a way of killing all
-                print("Kill")
                 Kill_Conn.send("kill")
             elif  request.form.get('bar') == 'foo':
-                # pass # do something else
                 print("foo bar")
             else:
-                # pass # unknown
                 pass
     elif request.method == 'GET':
-        # return render_template("index.html")
         print("No Post Back Call")
     return render_template('control.html')
-#GUI
+
+#---------- GUI Thread -------------#
 def GUI():
     global gui
     gui = Main()
@@ -910,6 +916,7 @@ def GUI():
     gui.after(100,kill_check)
     gui.mainloop()
 
+#------- Webserver Thread ----------#
 def Server(Q, L, N, K):
     global app, web_frame, C_CMD, N_CMD, Kill_Conn
     web_frame = Q
@@ -919,6 +926,7 @@ def Server(Q, L, N, K):
     if __name__ == '__mp_main__':
         app.run(host='0.0.0.0', port = 80)
 
+#Starts all the threads and pages.
 if __name__ == "__main__":
     Frames = multiprocessing.Queue(5)
     Current_cmd = multiprocessing.Queue(1)
