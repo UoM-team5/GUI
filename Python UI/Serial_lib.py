@@ -196,7 +196,7 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                 #Shutter: [sID... rID PK2 V1 S]
                 num = pk_split[1][1]
                 state = pk_split[2][1]
-                print("Shutter state {} ".format(state))
+                Comps.shutter.set_state(state)
                 return "Shutter state {} ".format(state)
             
             case "M":
