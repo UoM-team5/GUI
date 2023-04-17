@@ -795,9 +795,9 @@ def task():
 
     #To simulate getting commands this will be replaced with actual ones
     #------- start ----------#
-    temp_list = []
-    for i in range(0,10):
-        temp_list.append(random.randint(0,10))
+    temp_list = buffer.READ()
+    #for i in range(0,10):
+    #    temp_list.append(random.randint(0,10))
     try:
         Current_cmd.put(temp_list[0], block=False)
     except:
@@ -867,6 +867,9 @@ def Main_page():
     if request.method == 'POST':
             if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
                 Kill_Conn.send("kill") # Sends kill command on kill pipe
+            elif request.form.get('Screenshot') == 'SS':
+                print("capture screen")
+                cv2.imwrite()
             else:
                 pass
     elif request.method == 'GET':

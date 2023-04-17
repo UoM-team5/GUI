@@ -16,8 +16,10 @@
 			<h1>
 				Camera feed
 			</h1>
-			<img id="stream" src="{{ url_for('video_feed') }}" alt="view" style="width: auto; height:80%;">
-
+			<img id="stream" src="{{ url_for('video_feed') }}" alt="view" style="width: auto; height:70%;">
+			<form method="post" action="/">
+				<input type="submit" value="SS" name="Screenshot" />
+			</form>
 		</Image_stream>
 
 		<Monitor>
