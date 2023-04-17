@@ -97,71 +97,32 @@ def PRETTY_LINE(command):
     pk_split = PK.split(" ", n_pk)
     operator = MyStr(pk_split[1])
     out = str(senderID)
-    if n_pk==1:
-        # single package commands
-        match operator:
-            case "ERR":
-                out += " ERROR"
-                match operator[3]:
-                    case "0":
-                        return (out + " 0: Incorrect packet format")
-                    case "1":
-                        return (out + " 1: Packet missing items")
-                    case "2":
-                        return (out + " 2: Incorrect Device ID")
-                    case "3":
-                        return (out + " 3: Incorrect Sender ID")
-                    case "4":
-                        return (out + " 4: System is in error state.")
-                    case _:
-                        print("Unkown Error number {}".format(operator[3]))
-
-            case "ACK":
-                return (out + " Acknowledge")
-
-            case "BUSY":
-                return (out + " BUSY")
-
-            case "VALID": 
-                return (out + " VALID")
-
-            case "FREE":
-                return (out + " FREE")
-            
-            case _:
-                return out + " unrecognised package: " + PK
-    else:
-        #multi package commands 
-        match operator[0]:
-            case "P":
-                #Pump: [sID... rID PK3 P1 m10.2]
-                num = int(pk_split[1][1])
-                vol = float(pk_split[2][1:])
-                return "Pump {}: volume {} ".format(num, vol)
-            
-            case "V":
-                #Valve: [sID... rID PK2 V1 S]
-                num = pk_split[1][1]
-                state = pk_split[2][1]
-                print("Valve num {}, state {} ".format(num, state))
-                return "Valve {}: state {} ".format(num, state)
-            
-            case "I":
-                #Shutter: [sID... rID PK2 V1 S]
-                num = pk_split[1][1]
-                state = pk_split[2][1]
-                print("Shutter state {} ".format(state))
-                return "Shutter state {} ".format(state)
-            
-            case "M":
-                #mixer
-                num = pk_split[1][1]
-                state = pk_split[2][1]
-                print("Mixer num {}, state {} ".format(num, state))
-                return "Mixer state {}".format(state)
-            case _:
-                print("operator ",operator)
-                return out + " unrecognised cmd package: " + PK
+    match operator[0]:
+        case "P":
+            #Pump: [sID... rID PK3 P1 m10.2]
+            num = int(pk_split[1][1])
+            vol = float(pk_split[2][1:])
+            return "Pump {}: volume {} ".format(num, vol)
+        
+        case "V":
+            #Valve: [sID... rID PK2 V1 S]
+            num = pk_split[1][1]
+            state = pk_split[2][1]
+            return "Valve {}: state {} ".format(num, state)
+        
+        case "I":
+            #Shutter: [sID... rID PK2 V1 S]
+            num = pk_split[1][1]
+            state = pk_split[2][1]
+            return "Shutter state {} ".format(state)
+        
+        case "M":
+            #mixer
+            num = pk_split[1][1]
+            state = pk_split[2][1]
+            return "Mixer state {}".format(state)
+        case _:
+            return out + " unrecognised cmd package: " + PK
 
 class MyStr(str):
     def __eq__(self, other):
