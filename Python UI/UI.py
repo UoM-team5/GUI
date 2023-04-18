@@ -430,6 +430,12 @@ class P_Param(ctk.CTkFrame):
         mode_switch = ctk.CTkSwitch(master=tabs.tab("Interface"), text="Dark Mode", command=lambda: set_mode(mode_switch.get()), onvalue=1, offvalue=0)
         mode_switch.select()
         mode_switch.place(relx=0.5, rely=0.1, anchor='center')
+
+        global rem_control
+        rem_control = ctk.CTkSwitch(master=tabs.tab("Interface"), text="Remote control", onvalue=1, offvalue=0)
+        rem_control.select()
+        rem_control.place(relx=0.5, rely=0.3, anchor='center')
+
         _, ent_app = place_2(0.3, *entry_block(frame_push, text='app token'), relx=0.27)
         _, ent_user = place_2(0.6, *entry_block(frame_push, text='user key'), relx=0.27)
         btn_save = btn(frame_push, 'save', command=lambda: phone.set_token(ent_app.get(), ent_user.get()))
@@ -808,7 +814,6 @@ def task():
         except:
             pass
     #-------- end ----------#
-
     gui.after(200, task)
     time.sleep(0.01)
 
@@ -816,7 +821,7 @@ def task():
 
 #Global 
 # Queues and pipes to share and communicate between threads
-global web_frame, C_CMD, N_CMD, Kill_Conn
+global web_frame, C_CMD, N_CMD, Kill_Conn, Pump_Conn
 
 # Grabs the latest frame and puts it onto a Queue for the webpage to read and display
 def Web_Camera():
@@ -826,15 +831,21 @@ def Web_Camera():
         Frames.put(frame, block=False)# puts frame on queue, only stores the last 5 frames
     except:
         pass
-    gui.after(200,Web_Camera) # executes it every 200ms 
-
-# Checks for a kill command from the webpage and kills all processes
-def kill_check(): 
     if Kill_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
         if Kill_rev.recv() == "kill": # if the command is kill
             print("this is a kill command")
             gui.Quit_application() # Quits all applications
-    gui.after(100,kill_check) # checks pipe every 100ms
+    if rem_control.get() and Pump_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
+        command = Pump_rev.recv()
+        if command == "PUMP": # if the command is kill
+            print("this is a Pump command")
+            Comps.pumps[0].pump(5)
+        if command == "Shutter":
+            print("This is a shutter command")
+            Comps.shutter.open()
+    elif Pump_rev.poll(timeout=0.1):
+        Pump_rev.recv()
+    gui.after(200,Web_Camera) # executes it every 200ms 
 
 app = Flask(__name__) #main web application
 
@@ -870,6 +881,12 @@ def Main_page():
             elif request.form.get('Screenshot') == 'SS':
                 print("capture screen")
                 cv2.imwrite()
+            elif  request.form.get('Pump') == 'Pump':
+                print("Pump")
+                Pump_Conn.send("PUMP")
+            elif  request.form.get('Shutter') == 'Shutter':
+                print("Shutter")
+                Pump_Conn.send("Shutter")
             else:
                 pass
     elif request.method == 'GET':
@@ -882,10 +899,10 @@ def gen_frames():
         try:
             frame = web_frame.get(block=False) # gets the most recent frames
             try:   
-                ret, buffer = cv2.imencode('.jpg', frame) #encodes the frame and stores it in a buffer
+                ret, buffer = cv2.imencode('.jpg', frame) # encodes the frame and stores it in a buffer
                 frame = buffer.tobytes() # converts to bytes
                 yield (b'--frame\r\n'
-                        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
+                        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  #Concat frame one by one and show result
             except:
                 pass
         except:
@@ -897,13 +914,14 @@ def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 #New control page
-@app.route('/control')
+@app.route('/control', methods=['GET', 'POST'])
 def control_page():
     if request.method == 'POST':
             if request.form.get('Kill') == 'Kill':
                 Kill_Conn.send("kill")
-            elif  request.form.get('bar') == 'foo':
-                print("foo bar")
+            elif  request.form.get('Pump') == 'Pump':
+                print("Pump")
+                Pump_Conn.send("PUMP")
             else:
                 pass
     elif request.method == 'GET':
@@ -916,16 +934,16 @@ def GUI():
     gui = Main()
     gui.after(100,task)
     gui.after(200,Web_Camera)
-    gui.after(100,kill_check)
     gui.mainloop()
 
 #------- Webserver Thread ----------#
-def Server(Q, L, N, K):
-    global app, web_frame, C_CMD, N_CMD, Kill_Conn
+def Server(Q, L, N, K, P):
+    global app, web_frame, C_CMD, N_CMD, Kill_Conn, Pump_Conn
     web_frame = Q
     C_CMD = L
     N_CMD = N
     Kill_Conn = K
+    Pump_Conn = P
     if __name__ == '__mp_main__':
         app.run(host='0.0.0.0', port = 80)
 
@@ -935,9 +953,11 @@ if __name__ == "__main__":
     Current_cmd = multiprocessing.Queue(1)
     Next_cmd = multiprocessing.Queue(4)
     Kill_rev, Kill_send = multiprocessing.Pipe(duplex = False)
-    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send))
+    Pump_rev, Pump_send = multiprocessing.Pipe(duplex = False)
+    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, Pump_send))
     server.start()
     GUI()
+    
     server.terminate()
     server.join()
     
