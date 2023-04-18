@@ -766,14 +766,13 @@ class OpenNewWindow(tk.Tk):
         label1.pack(side="top")
 
 def Event(MESSAGES):
-    #MESSAGES can be a list or single element
     for MESSAGE in MESSAGES:
         match MESSAGE[5]:
             case "E":
                 com.Log("ERROR: wrong command sent")
 
             case "V":
-                print("validated: ")
+                # Command is Valid
                 arduinos[0].busy()
                 command = buffer.POP()
                 com.Log(com.DECODE_LINE(command, Comps))
@@ -787,14 +786,24 @@ def Event(MESSAGES):
 
 def task():
     global device
+    # Handle multi-arduino two-way communication
     if len(arduinos):
+        # Check if arduinos are not busy and the buffer is not empty
         if (arduinos[0].state==False) and (buffer.Left()>0):
+            # Handle next command in buffer 
+            # command is not removed from buffer yet except for notifications (immidiatly popped)
             buffer.OUT()
+            # if buffer was not blocked and buffer is not empty => arduino command sent to serial 
             if not buffer.blocked and (buffer.Left()>0):
+                # keep track of current device busy
                 device = buffer.READ_DEVICE()
+                # Set all arduinos to busy
                 arduinos[0].busy()
+
+        # wait for response from current device busy
         try:
             if (device.inWaiting() > 0):
+                # handle response from device
                 Event(com.READ(device))
         except:
             pass
