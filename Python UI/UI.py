@@ -272,6 +272,8 @@ class MenuBar(tk.Menu):
 
         self.add_command(label="Manual", command=lambda: parent.show_frame(P_Test))
 
+        self.add_command(label="Cabinet Setup", command=lambda: parent.show_frame(P_Setup))
+
         menu_auto = tk.Menu(self, tearoff=0)
         self.add_cascade(label="Auto", menu=menu_auto)
         menu_auto.add_command(label="MVP",font=('Arial',11), command=lambda: parent.show_frame(P_Auto))
@@ -297,7 +299,7 @@ class Main(ctk.CTk):
 
         self.frames = {}
 
-        for F in (P_Init, P_Home, P_Test, P_Auto, P_Iter, P_Hist, P_Param, P_Cam):
+        for F in (P_Init, P_Home, P_Test, P_Auto, P_Iter, P_Hist, P_Param, P_Cam, P_Setup):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -505,6 +507,55 @@ class P_Test(ctk.CTkFrame):
         _, ent_mix = place_2(0.2, *entry_block(frame3, "speed : "))
         btn1 = btn(frame3, text="send", command=lambda: Comps.mixer.mix(int(ent_mix.get())))
         btn1.place(relx = 0.5, rely = 0.35, anchor = 'center')
+
+class P_Setup(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        ctk.CTkFrame.__init__(self,parent)
+        title = ctk.CTkLabel(self, text = "Cabinet Setup", font=font_L)
+        title.place(relx = 0.5, rely = 0.05, anchor = 'center')
+        
+        frame1 = Frame(self, text = "")
+        frame1.place(relx=0.175, rely=0.15, relwidth=0.3, relheight=0.8, anchor = 'n')
+        frame12 = Frame(frame1, text = "", fg_color = 'transparent')
+        frame12.place(relx=0, rely=1, relwidth=1, relheight=0.5, anchor = 'sw')
+
+        # frame2 = Frame(self, text = "Pump")
+        # frame2.place(relx=0.5, rely=0.15, relwidth=0.3, relheight=0.8, anchor = 'n')
+
+        # frame3 = Frame(self, text = "Mixer")
+        # frame3.place(relx=0.825, rely=0.15, relwidth=0.3, relheight=0.38, anchor = 'n')
+
+        # frame4= Frame(self, text = "Sensors")
+        # frame4.place(relx=0.825, rely=0.55, relwidth=0.3, relheight=0.4, anchor = 'n')
+
+        #box 1 Valve
+        self.label_height, self.ent_height = entry_block(frame = frame1, text="Platform distance from source: ", spin = True, from_ = 41, to_ = 58.5)
+        place_2(rely= 0.2, relx = 0.8, lbl=self.label_height, entry= self.ent_height)
+
+        self.label_grey, self.ent_grey = entry_block(frame = frame12, text="Desired dose rate at reactor: ", spin = True) #, from_ = 41, to_ = 58.5)
+        place_2(rely= 0.2, relx = 0.8, lbl=self.label_grey, entry= self.ent_grey)
+
+        def update_grey(self):
+            x = float(self.ent_height.get())
+            y = round(17745/((x-11.3)**2.095), 2)
+            self.ent_grey.set(y)
+
+        def update_height(self):
+            x = float(self.ent_grey.get())
+            y = round((106.82/(x**0.477))+11.3, 2)
+            self.ent_height.set(y)
+
+        btn_grey = btn(frame1, text="Convert Height to Dose rate", command= lambda: update_grey(self))
+        btn_grey.place(relx = 0.5, rely = 0.3, anchor = 'center')
+
+        btn_height = btn(frame12, text="Convert Dose rate to Height", command= lambda: update_height(self))
+        btn_height.place(relx = 0.5, rely = 0.3, anchor = 'center')
+
+                
+
+       
+
+       
 
 class P_Auto(ctk.CTkFrame):
     def __init__(self, parent, controller):
