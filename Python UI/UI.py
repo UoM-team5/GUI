@@ -926,9 +926,21 @@ def gen_frames():
 #Renders a webpage fro pure video streaming which is linked to on main page
 @app.route('/video_feed')
 def video_feed():
-    if logged_in == False:
+    global logged_in
+    if request.remote_addr not in logged_in:
+        if request.form.get('Login') == 'Login':
+            Username = request.form.get('User')
+            Password = request.form.get('Pass')
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+                creds = list(csv.reader(login))
+            for creds in creds:
+                if creds[0] == Username:
+                    if creds[1] == Password:
+                        logged_in.append(request.remote_addr)
+
+    if request.remote_addr not in logged_in:
         template = {
-            'address': '/video_feed',
+            'address': '/',
         }
         return render_template('login.html', **template) #Renders webpage 
     else:
@@ -937,9 +949,21 @@ def video_feed():
 #New control page
 @app.route('/control', methods=['GET', 'POST'])
 def control_page():
-    if logged_in == False:
+    global logged_in
+    if request.remote_addr not in logged_in:
+        if request.form.get('Login') == 'Login':
+            Username = request.form.get('User')
+            Password = request.form.get('Pass')
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+                creds = list(csv.reader(login))
+            for creds in creds:
+                if creds[0] == Username:
+                    if creds[1] == Password:
+                        logged_in.append(request.remote_addr)
+
+    if request.remote_addr not in logged_in:
         template = {
-            'address': '/control',
+            'address': '/',
         }
         return render_template('login.html', **template) #Renders webpage 
     else:
