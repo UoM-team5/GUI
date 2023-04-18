@@ -3,7 +3,7 @@ from tkinter import ttk
 from PIL import Image
 import customtkinter as ctk
 import Serial_lib as com 
-from Serial_lib import Pump, Valve, Shutter, Mixer, Vessel, Nano 
+from Serial_lib import Pump, Valve, Shutter, Mixer, Extract, Vessel, Nano
 import os, cv2, time, multiprocessing, random
 from flask import Flask, render_template, Response, request
 from chump import Application
@@ -172,11 +172,12 @@ def init_module(label=None):
     try: com.CLOSE_SERIAL_PORT(arduinos)
     except: pass
     Ports = com.ID_PORTS_AVAILABLE()
-    arduinos = [0]*5
+    arduinos = [0]*6
     valves = [0]*5
-    pumps = [0]*4
+    pumps = [0]*5
     shutter = 0
     mixer = 0
+    extract = 0
     ves_in = [0]*3
     ves_out = [0]*6
     ves_main = Vessel(0, "ves_main")
@@ -226,7 +227,11 @@ def init_module(label=None):
             arduinos[4].add_component("Shutter Module")
             shutter = Shutter(device, deviceID, 1, buffer)
             mixer = Mixer(device, deviceID, 1, buffer)
-    
+        if deviceID=="1006":
+            arduinos[5] = Nano(device, deviceID, Ports[i])
+            arduinos[5].add_component("Extraction Module")
+            extract = Extract(device, deviceID, 1, buffer, n_slots = 5)
+            pumps[4] = Pump(device, deviceID, 5, buffer)
     for i in range(len(arduinos)):
         try:arduinos.remove(0)
         except:pass
@@ -242,6 +247,7 @@ def init_module(label=None):
     Comps.pumps = pumps         #array
     Comps.mixer = mixer
     Comps.shutter = shutter
+    Comps.extract = extract
     Comps.Temp = [-1]
     Comps.Bubble = [-1]*3
     Comps.LDS = [-1]*4
@@ -480,7 +486,7 @@ class P_Test(ctk.CTkFrame):
         frame3 = Frame(self, text = "Mixer")
         frame3.place(relx=0.825, rely=0.15, relwidth=0.3, relheight=0.38, anchor = 'n')
 
-        frame4= Frame(self, text = "Sensors")
+        frame4= Frame(self, text = "Extract")
         frame4.place(relx=0.825, rely=0.55, relwidth=0.3, relheight=0.4, anchor = 'n')
 
         #box 1 Valve
@@ -514,6 +520,12 @@ class P_Test(ctk.CTkFrame):
         _, ent_mix = place_2(0.2, *entry_block(frame3, "speed : "))
         btn1 = btn(frame3, text="send", command=lambda: Comps.mixer.mix(int(ent_mix.get())))
         btn1.place(relx = 0.5, rely = 0.35, anchor = 'center')
+
+        #box 4 extract
+        _, ent_ext = place_2(0.2,*entry_block(frame4, "select slot: ", spin=True, from_=1, to=5))
+        ent_ext.config(command=lambda: Comps.extract.set_slot(int(ent_ext.get())))
+        
+
 
 class P_Auto(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -773,7 +785,6 @@ def Event(MESSAGES):
 
             case "V":
                 # Command is Valid
-                arduinos[0].busy()
                 command = buffer.POP()
                 com.Log(com.DECODE_LINE(command, Comps))
 
