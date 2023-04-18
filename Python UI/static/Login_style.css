@@ -11,6 +11,10 @@ input[type=text], input[type=password] {
   box-sizing: border-box;
 }
 
+h1{
+    text-align: center;
+}
+
 Spac{
     float: left;
     width: 50%;
