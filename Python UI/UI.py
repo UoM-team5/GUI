@@ -917,11 +917,20 @@ def video_feed():
 @app.route('/control', methods=['GET', 'POST'])
 def control_page():
     if request.method == 'POST':
-            if request.form.get('Kill') == 'Kill':
-                Kill_Conn.send("kill")
+            if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
+                Kill_Conn.send("kill") # Sends kill command on kill pipe
+                return render_template('control.html')
+            elif request.form.get('Screenshot') == 'SS':
+                print("capture screen")
+                cv2.imwrite()
             elif  request.form.get('Pump') == 'Pump':
                 print("Pump")
                 Pump_Conn.send("PUMP")
+                return render_template('control.html')
+            elif  request.form.get('Shutter') == 'Shutter':
+                print("Shutter")
+                Pump_Conn.send("Shutter")
+                return render_template('control.html')
             else:
                 pass
     elif request.method == 'GET':
@@ -957,7 +966,6 @@ if __name__ == "__main__":
     server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, Pump_send))
     server.start()
     GUI()
-    
     server.terminate()
     server.join()
     
