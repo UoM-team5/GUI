@@ -4,7 +4,7 @@ from PIL import Image
 import customtkinter as ctk
 import Serial_lib as com 
 from Serial_lib import Pump, Valve, Shutter, Mixer, Vessel, Nano 
-import os, cv2, time, multiprocessing, random
+import os, cv2, time, multiprocessing, random, datetime
 from flask import Flask, render_template, Response, request
 from chump import Application
 import logging
@@ -821,10 +821,10 @@ def task():
 
 #Global 
 # Queues and pipes to share and communicate between threads
-global web_frame, C_CMD, N_CMD, Kill_Conn, Pump_Conn
+global web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn
 
 # Grabs the latest frame and puts it onto a Queue for the webpage to read and display
-def Web_Camera():
+def GUI_Server_Comms():
     global cam
     _, frame = cam.read() # reusing GUI cam instance
     try:
@@ -833,19 +833,19 @@ def Web_Camera():
         pass
     if Kill_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
         if Kill_rev.recv() == "kill": # if the command is kill
-            print("this is a kill command")
+            print("The system has been KILLED")
             gui.Quit_application() # Quits all applications
-    if rem_control.get() and Pump_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
-        command = Pump_rev.recv()
+    if rem_control.get() and CMD_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
+        command = CMD_rev.recv()
         if command == "PUMP": # if the command is kill
             print("this is a Pump command")
             Comps.pumps[0].pump(5)
         if command == "Shutter":
             print("This is a shutter command")
             Comps.shutter.open()
-    elif Pump_rev.poll(timeout=0.1):
-        Pump_rev.recv()
-    gui.after(200,Web_Camera) # executes it every 200ms 
+    elif CMD_rev.poll(timeout=0.1):
+        CMD_rev.recv()
+    gui.after(200,GUI_Server_Comms) # executes it every 200ms 
 
 app = Flask(__name__) #main web application
 
@@ -878,19 +878,14 @@ def Main_page():
     if request.method == 'POST':
             if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
                 Kill_Conn.send("kill") # Sends kill command on kill pipe
-            elif request.form.get('Screenshot') == 'SS':
-                print("capture screen")
-                cv2.imwrite()
-            elif  request.form.get('Pump') == 'Pump':
-                print("Pump")
-                Pump_Conn.send("PUMP")
-            elif  request.form.get('Shutter') == 'Shutter':
-                print("Shutter")
-                Pump_Conn.send("Shutter")
+            elif request.form.get('Screenshot') == 'Screenshot':
+                frame = web_frame.get()
+                file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_') + ".jpg"
+                cv2.imwrite(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'screenshots\\', file_name), frame)
             else:
                 pass
     elif request.method == 'GET':
-        print("No Post Back Call")
+        pass
     return render_template('Main.html', **template) #Renders webpage 
 
 # generates videofeed from frame queue
@@ -920,21 +915,22 @@ def control_page():
             if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
                 Kill_Conn.send("kill") # Sends kill command on kill pipe
                 return render_template('control.html')
-            elif request.form.get('Screenshot') == 'SS':
-                print("capture screen")
-                cv2.imwrite()
+            elif request.form.get('Screenshot') == 'Screenshot':
+                frame = web_frame.get() 
+                file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_')  + ".jpg"
+                cv2.imwrite(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'screenshots\\', file_name), frame)
             elif  request.form.get('Pump') == 'Pump':
                 print("Pump")
-                Pump_Conn.send("PUMP")
+                CMD_Conn.send("PUMP")
                 return render_template('control.html')
             elif  request.form.get('Shutter') == 'Shutter':
                 print("Shutter")
-                Pump_Conn.send("Shutter")
+                CMD_Conn.send("Shutter")
                 return render_template('control.html')
             else:
                 pass
     elif request.method == 'GET':
-        print("No Post Back Call")
+        pass
     return render_template('control.html')
 
 #---------- GUI Thread -------------#
@@ -942,17 +938,17 @@ def GUI():
     global gui
     gui = Main()
     gui.after(100,task)
-    gui.after(200,Web_Camera)
+    gui.after(200,GUI_Server_Comms)
     gui.mainloop()
 
 #------- Webserver Thread ----------#
 def Server(Q, L, N, K, P):
-    global app, web_frame, C_CMD, N_CMD, Kill_Conn, Pump_Conn
+    global app, web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn
     web_frame = Q
     C_CMD = L
     N_CMD = N
     Kill_Conn = K
-    Pump_Conn = P
+    CMD_Conn = P
     if __name__ == '__mp_main__':
         app.run(host='0.0.0.0', port = 80)
 
@@ -962,8 +958,8 @@ if __name__ == "__main__":
     Current_cmd = multiprocessing.Queue(1)
     Next_cmd = multiprocessing.Queue(4)
     Kill_rev, Kill_send = multiprocessing.Pipe(duplex = False)
-    Pump_rev, Pump_send = multiprocessing.Pipe(duplex = False)
-    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, Pump_send))
+    CMD_rev, CMD_send = multiprocessing.Pipe(duplex = False)
+    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, CMD_send))
     server.start()
     GUI()
     server.terminate()
