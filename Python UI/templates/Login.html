@@ -6,21 +6,36 @@
 </head>
 
 <body>
-    <h2>Login Form</h2>
-    <form action="{{address}}" method="post">
-        <div class="container">
-            <label for="uname"><b>Username</b></label>
-            <input type="text" placeholder="Enter Username" name="uname" required>
+    <section>
+        <test>
+            <section>
+                <Spac>
+                    <div>
 
-            <label for="psw"><b>Password</b></label>
-            <input type="password" placeholder="Enter Password" name="psw" required>
+                    </div>
+                </Spac>
+                <login>
+                    <h2>Login Form</h2>
+                    <form method="post" action="{{address}}">
+                        <div class="container">
+                            <label for="User"><b>Username</b></label>
+                            <input type="text" placeholder="Enter Username" name="User" required>
+                            <label for="User"><b>Password</b></label>
+                            <input type="password" placeholder="Enter Password" name="Pass" required>
+                            <button type="submit" value="Login" name="Login">Login</button>
+                        </div>
+                    </form>
+                </login>
+            </section>
+        </test>
+        <Spac1>
+            <div>
 
-            <button type="submit">Login</button>
-            <label>
-                <input type="checkbox" checked="checked" name="remember"> Remember me
-            </label>
-        </div>
-    </form>
+            </div>
+        </Spac1>
+
+    </section>
+
 </body>
 
 <link rel="stylesheet" href="../static/login_style.css/">

@@ -11,6 +11,26 @@ input[type=text], input[type=password] {
   box-sizing: border-box;
 }
 
+Spac{
+    float: left;
+    width: 50%;
+}
+login{
+    float: right;
+    width: 50%;
+    text-align: center;
+}
+test{
+    float: left;
+    width: 66%;
+}
+Spac1{
+    float: right;
+    width: 33%;
+}
+
+
+
 button {
   background-color: #ff0000;
   color: white;
@@ -40,7 +60,5 @@ span.psw {
      display: block;
      float: none;
   }
-  .cancelbtn {
-     width: 100%;
-  }
+
 }

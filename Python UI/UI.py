@@ -7,7 +7,7 @@ from Serial_lib import Pump, Valve, Shutter, Mixer, Vessel, Nano
 import os, cv2, time, multiprocessing, random, datetime
 from flask import Flask, render_template, Response, request
 from chump import Application
-import logging
+import logging, csv
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
@@ -849,12 +849,24 @@ def GUI_Server_Comms():
 
 app = Flask(__name__) #main web application
 
-logged_in = True
+logged_in = []
 
 #main page of the website
 @app.route("/", methods=['GET', 'POST']) # methods of interating and route address
 def Main_page():
-    if logged_in == False:
+    global logged_in
+    if request.remote_addr not in logged_in:
+        if request.form.get('Login') == 'Login':
+            Username = request.form.get('User')
+            Password = request.form.get('Pass')
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+                creds = list(csv.reader(login))
+            for creds in creds:
+                if creds[0] == Username:
+                    if creds[1] == Password:
+                        logged_in.append(request.remote_addr)
+
+    if request.remote_addr not in logged_in:
         template = {
             'address': '/',
         }
