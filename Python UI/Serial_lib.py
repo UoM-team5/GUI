@@ -206,6 +206,12 @@ def DECODE_PACKAGE(senderID, PK, Comps):
                 print("Mixer num {}, state {} ".format(num, state))
                 return "Mixer state {}".format(state)
             
+            case "E": 
+                num = pk_split[1][1]
+                state = pk_split[2][1:]
+                Comps.extract.current_slot = state
+                return "Extract state {} ".format(state)
+            
             case "S": 
                 out += " sensors "
                 for idx in range(len(pk_split)):
@@ -453,6 +459,26 @@ class Mixer:
 
     def mix(self, speed: int):
         return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, speed)])
+
+class Extract:
+    def __init__(self, device, ID, component_number: int, buffer, n_slots):
+        self.device = device
+        self.ID = ID
+        self.num = component_number
+        self.buffer = buffer
+        self.n_slots = n_slots
+        self.step_angle = 180/(n_slots-1)
+        self.current_slot = 0
+
+    def set_slot(self, slot):
+        if slot<=self.n_slots and slot>0:
+            angle = (slot-1)*self.step_angle
+            self.buffer.IN([self.device, "[sID1000 rID{} PK2 E{} S{}]".format(self.ID, self.num, angle)])
+        else:
+            print('Slot number', slot, 'is out of scope')
+
+    def get_slot(self):
+        return self.current_slot
 
 class Vessel: 
     def __init__(self, volume = 10.0, liquid_name = 'none'):
