@@ -886,15 +886,14 @@ def Main_page():
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
-            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'credentials.csv'), newline='') as login:
                 creds = list(csv.reader(login))
             for creds in creds:
                 if creds[0] == Username:
                     if creds[1] == Password:
                         logged_in.append([request.remote_addr,creds[2]])
                                            
-    if any(request.remote_addr in User for User in logged_in):
-        print(1)          
+    if any(request.remote_addr in User for User in logged_in):    
         # Reads all the current commands in the buffer and addes N/A if blank
         Next =[] # list of next 4 commands
         for i in range(0, 4):
@@ -932,7 +931,6 @@ def Main_page():
         return render_template('Main.html', **template) #Renders webpage
                             
     else:
-        print(0)
         template = {
             'address': '/',
         }
@@ -985,7 +983,7 @@ def control_page():
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
-            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'credentials.csv'), newline='') as login:
                 creds = list(csv.reader(login))
             for creds in creds:
                 if creds[0] == Username:
@@ -1015,7 +1013,6 @@ def control_page():
             pass
         return render_template('control.html')          
     else:
-        print(0)
         template = {
             'address': '/',
         }
