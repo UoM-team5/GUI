@@ -849,13 +849,14 @@ def GUI_Server_Comms():
 
 app = Flask(__name__) #main web application
 
-logged_in = []
+logged_in = list()
+logged_in.append(['N/A','N/A'])
 
 #main page of the website
 @app.route("/", methods=['GET', 'POST']) # methods of interating and route address
 def Main_page():
     global logged_in
-    if request.remote_addr not in logged_in:
+    if any(request.remote_addr not in User for User in logged_in):
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
@@ -864,14 +865,10 @@ def Main_page():
             for creds in creds:
                 if creds[0] == Username:
                     if creds[1] == Password:
-                        logged_in.append(request.remote_addr)
-
-    if request.remote_addr not in logged_in:
-        template = {
-            'address': '/',
-        }
-        return render_template('login.html', **template) #Renders webpage 
-    else:
+                        logged_in.append([request.remote_addr,creds[2]])
+                                           
+    if any(request.remote_addr in User for User in logged_in):
+        print(1)          
         # Reads all the current commands in the buffer and addes N/A if blank
         Next =[] # list of next 4 commands
         for i in range(0, 4):
@@ -906,8 +903,15 @@ def Main_page():
                     pass
         elif request.method == 'GET':
             pass
-        return render_template('Main.html', **template) #Renders webpage 
-
+        return render_template('Main.html', **template) #Renders webpage
+                            
+    else:
+        print(0)
+        template = {
+            'address': '/',
+        }
+        return render_template('login.html', **template) #Renders webpage
+        
 # generates videofeed from frame queue
 def gen_frames(): 
     while True:
@@ -927,7 +931,7 @@ def gen_frames():
 @app.route('/video_feed')
 def video_feed():
     global logged_in
-    if request.remote_addr not in logged_in:
+    if any(request.remote_addr not in User for User in logged_in):
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
@@ -936,21 +940,22 @@ def video_feed():
             for creds in creds:
                 if creds[0] == Username:
                     if creds[1] == Password:
-                        logged_in.append(request.remote_addr)
-
-    if request.remote_addr not in logged_in:
+                        logged_in.append([request.remote_addr,creds[2]])
+    if any(request.remote_addr in User for User in logged_in):
+        return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')            
+    else:
+        print(0)
         template = {
             'address': '/',
         }
-        return render_template('login.html', **template) #Renders webpage 
-    else:
-        return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+        return render_template('login.html', **template) #Renders webpage
+        
 
 #New control page
 @app.route('/control', methods=['GET', 'POST'])
 def control_page():
     global logged_in
-    if request.remote_addr not in logged_in:
+    if any(request.remote_addr not in User for User in logged_in):
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
@@ -959,14 +964,9 @@ def control_page():
             for creds in creds:
                 if creds[0] == Username:
                     if creds[1] == Password:
-                        logged_in.append(request.remote_addr)
-
-    if request.remote_addr not in logged_in:
-        template = {
-            'address': '/',
-        }
-        return render_template('login.html', **template) #Renders webpage 
-    else:
+                        logged_in.append([request.remote_addr,creds[2]])
+                        
+    if any(request.remote_addr in User for User in logged_in):
         if request.method == 'POST':
                 if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
                     Kill_Conn.send("kill") # Sends kill command on kill pipe
@@ -987,7 +987,13 @@ def control_page():
                     pass
         elif request.method == 'GET':
             pass
-        return render_template('control.html')
+        return render_template('control.html')          
+    else:
+        print(0)
+        template = {
+            'address': '/',
+        }
+        return render_template('login.html', **template) #Renders webpage
 
 #---------- GUI Thread -------------#
 def GUI():

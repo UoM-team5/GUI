@@ -48,8 +48,8 @@ section {
 table {
 	font-family: arial, sans-serif;
 	border-collapse: collapse;
-	width: 100%;
-	padding-left: 5%;
+	width: 90%;
+	float: right;
 }
 
 td,
@@ -131,5 +131,3 @@ tr:nth-child(even) {
 	background-color: #ff6f00;
 	color: white;
 }
-
-

@@ -24,28 +24,36 @@
 
 		<Monitor>
 			<h1>Process Monitoring</h1>
-			<table>
-				<tr>
-					<th>Current Command</th>
-					<th>Next Command</th>
-				</tr>
-				<tr>
-					<td>{{Current}}</td>
-					<td>{{N1}}</td>
-				</tr>
-				<tr>
-					<td> </td>
-					<td>{{N2}}</td>
-				</tr>
-				<tr>
-					<td> </td>
-					<td>{{N3}}</td>
-				</tr>
-				<tr>
-					<td> </td>
-					<td>{{N4}}</td>
-				</tr>
-			</table>
+			<section>
+				<div style="width: 10%; float: right;"></div>
+				<div style="width: 90%; float: left;">
+					<section>
+						<div style="width: 10%; float: left;"></div>
+						<table>
+							<tr>
+								<th>Current Command</th>
+								<th>Next Command</th>
+							</tr>
+							<tr>
+								<td>{{Current}}</td>
+								<td>{{N1}}</td>
+							</tr>
+							<tr>
+								<td> </td>
+								<td>{{N2}}</td>
+							</tr>
+							<tr>
+								<td> </td>
+								<td>{{N3}}</td>
+							</tr>
+							<tr>
+								<td> </td>
+								<td>{{N4}}</td>
+							</tr>
+						</table>
+					</section>
+				</div>
+			</section>
 		</Monitor>
 	</section>
 
@@ -55,7 +63,7 @@
 	<form method="post" action="/">
 		<input type="submit" class="button_Kill buttonK" value="Kill" name="Kill" />
 	</form>
-	<form action="control"  method="get">
+	<form action="control" method="get">
 		<button class="button_Control buttonC" type="submit">Control</button>
 	</form>
 </body>
