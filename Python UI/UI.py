@@ -839,10 +839,16 @@ def GUI_Server_Comms():
         command = CMD_rev.recv()
         if command == "PUMP": # if the command is kill
             print("this is a Pump command")
-            Comps.pumps[0].pump(5)
+            try:
+                Comps.pumps[0].pump(5)
+            except:
+                pass
         if command == "Shutter":
             print("This is a shutter command")
-            Comps.shutter.open()
+            try:
+                Comps.shutter.open()
+            except:
+                pass
     elif CMD_rev.poll(timeout=0.1):
         CMD_rev.recv()
     gui.after(200,GUI_Server_Comms) # executes it every 200ms 
@@ -965,7 +971,7 @@ def control_page():
                 if creds[0] == Username:
                     if creds[1] == Password:
                         logged_in.append([request.remote_addr,creds[2]])
-                        
+
     if any(request.remote_addr in User for User in logged_in):
         if request.method == 'POST':
                 if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
