@@ -4,10 +4,10 @@ from PIL import Image
 import customtkinter as ctk
 import Serial_lib as com 
 from Serial_lib import Pump, Valve, Shutter, Mixer, Extract, Vessel, Nano
-import os, cv2, time, multiprocessing, random
+import os, cv2, time, multiprocessing, random, datetime
 from flask import Flask, render_template, Response, request
 from chump import Application
-import logging
+import logging, csv
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
@@ -841,10 +841,10 @@ def task():
 
 #Global 
 # Queues and pipes to share and communicate between threads
-global web_frame, C_CMD, N_CMD, Kill_Conn, Pump_Conn
+global web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn
 
 # Grabs the latest frame and puts it onto a Queue for the webpage to read and display
-def Web_Camera():
+def GUI_Server_Comms():
     global cam
     _, frame = cam.read() # reusing GUI cam instance
     try:
@@ -853,66 +853,85 @@ def Web_Camera():
         pass
     if Kill_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
         if Kill_rev.recv() == "kill": # if the command is kill
-            print("this is a kill command")
+            print("The system has been KILLED")
             gui.Quit_application() # Quits all applications
-    if rem_control.get() and Pump_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
-        command = Pump_rev.recv()
+    if rem_control.get() and CMD_rev.poll(timeout=0.1): # polls the kill pipeline for new commands
+        command = CMD_rev.recv()
         if command == "PUMP": # if the command is kill
             print("this is a Pump command")
             Comps.pumps[0].pump(5)
         if command == "Shutter":
             print("This is a shutter command")
             Comps.shutter.open()
-    elif Pump_rev.poll(timeout=0.1):
-        Pump_rev.recv()
-    gui.after(200,Web_Camera) # executes it every 200ms 
+    elif CMD_rev.poll(timeout=0.1):
+        CMD_rev.recv()
+    gui.after(200,GUI_Server_Comms) # executes it every 200ms 
 
 app = Flask(__name__) #main web application
+
+logged_in = list()
+logged_in.append(['N/A','N/A'])
 
 #main page of the website
 @app.route("/", methods=['GET', 'POST']) # methods of interating and route address
 def Main_page():
-    # Reads all the current commands in the buffer and addes N/A if blank
-    Next =[] # list of next 4 commands
-    for i in range(0, 4):
+    global logged_in
+    if any(request.remote_addr not in User for User in logged_in):
+        if request.form.get('Login') == 'Login':
+            Username = request.form.get('User')
+            Password = request.form.get('Pass')
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+                creds = list(csv.reader(login))
+            for creds in creds:
+                if creds[0] == Username:
+                    if creds[1] == Password:
+                        logged_in.append([request.remote_addr,creds[2]])
+                                           
+    if any(request.remote_addr in User for User in logged_in):
+        print(1)          
+        # Reads all the current commands in the buffer and addes N/A if blank
+        Next =[] # list of next 4 commands
+        for i in range(0, 4):
+            try: 
+                Next.append(N_CMD.get(block = False)) # reads queue and adds commands to the list.
+            except: 
+                Next.append("N/A") # N/A if it is not available
         try: 
-            Next.append(N_CMD.get(block = False)) # reads queue and adds commands to the list.
+            Current = C_CMD.get(block = False) #Reads current command 
         except: 
-            Next.append("N/A") # N/A if it is not available
-    try: 
-        Current = C_CMD.get(block = False) #Reads current command 
-    except: 
-        Current = "N/A"
+            Current = "N/A"
 
-    #To edit the webpage HTML file with the python data
-    template = {
-        'title': 'Arcadius Monitoring Page',
-        'Current' : Current,
-        'N1' : Next[0], #the next 4 commands
-        'N2' : Next[1],
-        'N3' : Next[2],
-        'N4' : Next[3]
-    }
-    
-    # Gets the request form the webpage about button presses
-    if request.method == 'POST':
-            if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
-                Kill_Conn.send("kill") # Sends kill command on kill pipe
-            elif request.form.get('Screenshot') == 'SS':
-                print("capture screen")
-                cv2.imwrite()
-            elif  request.form.get('Pump') == 'Pump':
-                print("Pump")
-                Pump_Conn.send("PUMP")
-            elif  request.form.get('Shutter') == 'Shutter':
-                print("Shutter")
-                Pump_Conn.send("Shutter")
-            else:
-                pass
-    elif request.method == 'GET':
-        print("No Post Back Call")
-    return render_template('Main.html', **template) #Renders webpage 
-
+        #To edit the webpage HTML file with the python data
+        template = {
+            'title': 'Arcadius Monitoring Page',
+            'Current' : Current,
+            'N1' : Next[0], #the next 4 commands
+            'N2' : Next[1],
+            'N3' : Next[2],
+            'N4' : Next[3]
+        }
+        
+        # Gets the request form the webpage about button presses
+        if request.method == 'POST':
+                if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
+                    Kill_Conn.send("kill") # Sends kill command on kill pipe
+                elif request.form.get('Screenshot') == 'Screenshot':
+                    frame = web_frame.get()
+                    file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_') + ".jpg"
+                    cv2.imwrite(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'screenshots\\', file_name), frame)
+                else:
+                    pass
+        elif request.method == 'GET':
+            pass
+        return render_template('Main.html', **template) #Renders webpage
+                            
+    else:
+        print(0)
+        template = {
+            'address': '/',
+        }
+        return render_template('login.html', **template) #Renders webpage
+        
 # generates videofeed from frame queue
 def gen_frames(): 
     while True:
@@ -931,39 +950,87 @@ def gen_frames():
 #Renders a webpage fro pure video streaming which is linked to on main page
 @app.route('/video_feed')
 def video_feed():
-    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    global logged_in
+    if any(request.remote_addr not in User for User in logged_in):
+        if request.form.get('Login') == 'Login':
+            Username = request.form.get('User')
+            Password = request.form.get('Pass')
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+                creds = list(csv.reader(login))
+            for creds in creds:
+                if creds[0] == Username:
+                    if creds[1] == Password:
+                        logged_in.append([request.remote_addr,creds[2]])
+    if any(request.remote_addr in User for User in logged_in):
+        return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')            
+    else:
+        print(0)
+        template = {
+            'address': '/',
+        }
+        return render_template('login.html', **template) #Renders webpage
+        
 
 #New control page
 @app.route('/control', methods=['GET', 'POST'])
 def control_page():
-    if request.method == 'POST':
-            if request.form.get('Kill') == 'Kill':
-                Kill_Conn.send("kill")
-            elif  request.form.get('Pump') == 'Pump':
-                print("Pump")
-                Pump_Conn.send("PUMP")
-            else:
-                pass
-    elif request.method == 'GET':
-        print("No Post Back Call")
-    return render_template('control.html')
+    global logged_in
+    if any(request.remote_addr not in User for User in logged_in):
+        if request.form.get('Login') == 'Login':
+            Username = request.form.get('User')
+            Password = request.form.get('Pass')
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+                creds = list(csv.reader(login))
+            for creds in creds:
+                if creds[0] == Username:
+                    if creds[1] == Password:
+                        logged_in.append([request.remote_addr,creds[2]])
+                        
+    if any(request.remote_addr in User for User in logged_in):
+        if request.method == 'POST':
+                if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
+                    Kill_Conn.send("kill") # Sends kill command on kill pipe
+                    return render_template('control.html')
+                elif request.form.get('Screenshot') == 'Screenshot':
+                    frame = web_frame.get() 
+                    file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_')  + ".jpg"
+                    cv2.imwrite(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'screenshots\\', file_name), frame)
+                elif  request.form.get('Pump') == 'Pump':
+                    print("Pump")
+                    CMD_Conn.send("PUMP")
+                    return render_template('control.html')
+                elif  request.form.get('Shutter') == 'Shutter':
+                    print("Shutter")
+                    CMD_Conn.send("Shutter")
+                    return render_template('control.html')
+                else:
+                    pass
+        elif request.method == 'GET':
+            pass
+        return render_template('control.html')          
+    else:
+        print(0)
+        template = {
+            'address': '/',
+        }
+        return render_template('login.html', **template) #Renders webpage
 
 #---------- GUI Thread -------------#
 def GUI():
     global gui
     gui = Main()
     gui.after(100,task)
-    gui.after(200,Web_Camera)
+    gui.after(200,GUI_Server_Comms)
     gui.mainloop()
 
 #------- Webserver Thread ----------#
 def Server(Q, L, N, K, P):
-    global app, web_frame, C_CMD, N_CMD, Kill_Conn, Pump_Conn
+    global app, web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn
     web_frame = Q
     C_CMD = L
     N_CMD = N
     Kill_Conn = K
-    Pump_Conn = P
+    CMD_Conn = P
     if __name__ == '__mp_main__':
         app.run(host='0.0.0.0', port = 80)
 
@@ -973,11 +1040,10 @@ if __name__ == "__main__":
     Current_cmd = multiprocessing.Queue(1)
     Next_cmd = multiprocessing.Queue(4)
     Kill_rev, Kill_send = multiprocessing.Pipe(duplex = False)
-    Pump_rev, Pump_send = multiprocessing.Pipe(duplex = False)
-    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, Pump_send))
+    CMD_rev, CMD_send = multiprocessing.Pipe(duplex = False)
+    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, CMD_send))
     server.start()
     GUI()
-    
     server.terminate()
     server.join()
     

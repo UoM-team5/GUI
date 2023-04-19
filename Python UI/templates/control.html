@@ -17,12 +17,12 @@
 				Camera feed
 			</h1>
 			<img id="stream" src="{{ url_for('video_feed') }}" alt="view" style="height:80%;width:80%">
-			<form method="post" action="/">
-				<input type="submit" value="Screenshot" name="SS" />
+			<form method="post" action="/control">
+				<input type="submit" value="Screenshot" name="Screenshot" />
 			</form>
 		</Image_stream>
 		<Control_section>
-			<form method="post" action="/">
+			<form method="post" action="/control">
 				<input type="submit"  value="Pump" name="Pump" />
 				<input type="submit"  value="Shutter" name="Shutter" />
 			</form>
@@ -32,10 +32,10 @@
 </head>
 
 <body>
-	<form method="post" action="/">
+	<form method="post" action="/control">
 		<input type="submit" class="button_Kill buttonK" value="Kill" name="Kill" />
 	</form>
-	<form action="http://127.0.0.1/" method="get">
+	<form action='/' method="get">
 		<button class="button_Home buttonH" type="submit">Home</button>
 	</form>
 
