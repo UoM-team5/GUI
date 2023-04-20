@@ -22,7 +22,7 @@ def set_mode(i: int):
     if i==1: ctk.set_appearance_mode("dark")
 set_mode(1)
 ctk.set_default_color_theme("dark-blue")
-
+path = os.path.dirname(os.path.realpath(__file__))
 class ProgressBar():
     def __init__(self, master, buffer):
         self.Pbar = ctk.CTkProgressBar(master, width= 300, height=25, corner_radius=5)
@@ -96,7 +96,7 @@ def btn_img(frame, text: str,  file_name: str, command=None, Xresize = 30, Yresi
     btn.image = photo
     return btn
 
-def entry_block(frame, text: str, spin=False, from_ = 0, to = 10, drop_list=None, wrap=True, **kwargs):
+def entry_block(frame, text: str, spin=False, from_ = 0, to = 10, drop_list=None, wrap=True, width=50, **kwargs):
     """label followed by entry widget"""
     lbl = ctk.CTkLabel(frame, font=font_XS, text = text)
     if (spin):
@@ -108,7 +108,7 @@ def entry_block(frame, text: str, spin=False, from_ = 0, to = 10, drop_list=None
                         width= 100)
     else:
         entry = ctk.CTkEntry(frame,
-                            width=50,
+                            width=width,
                             height=25,
                             font=font_XS,
                             border_width=0,
@@ -270,6 +270,107 @@ class Frame(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self.label = ctk.CTkLabel(self, text=text)
         self.label.grid(row=0, column=0, padx=20)
+
+class P_Login(ctk.CTk):
+    def __init__(self, *args, **kwargs):
+        ctk.CTk.__init__(self, *args, **kwargs)
+        ctk.CTk.wm_title(self, "Login")
+
+        title = ctk.CTkLabel(self, text = "Login Page", font=font_L)
+        title.place(relx = 0.5, rely = 0.1, anchor = 'center')
+
+        self.geometry("700x400") 
+        self.minsize(700,400) 
+
+        frame_login = Frame(self)  # this is the frame that holds all the login details and buttons
+        frame_login.place(relx= 0.5, rely = 0.55, relwidth=0.9, relheight=0.8, anchor = 'center')
+
+        lbl_user, entry_user = place_2(0.3, *entry_block(frame_login, text = "Username: ", width=100))
+        lbl_pw, entry_pw = place_2(0.5, *entry_block(frame_login, text = "Password: ", width=100))
+
+        btn_login = btn(frame_login, text="Login", command=lambda: getlogin())
+        btn_register = btn(frame_login, text="Register", command=lambda: go_signup())
+        
+        check_status = ctk.CTkCheckBox(frame_login, text="operator", onvalue="operator", offvalue="viewer")
+        btn_new_account = btn(frame_login, text="Create Account", command=lambda: signup())
+        btn_login_frame = btn(frame_login, text="Already signed up?", command=lambda: login())
+
+        
+        def login():
+            btn_new_account.place_forget()
+            check_status.place_forget()
+            btn_login_frame.place_forget()
+            lbl_user.configure(text='Username: ')
+            lbl_pw.configure(text='Password: ')
+            btn_login.place(rely=0.70, relx=0.50)
+            btn_register.place(rely=0.70, relx=0.75)
+        
+        def go_signup():
+            btn_login.place_forget()
+            btn_register.place_forget()
+            lbl_user.configure(text='New Username: ')
+            lbl_pw.configure(text='New Password: ')
+            btn_login_frame.place(rely=0.70, relx=0.75)
+            btn_new_account.place(relx=0.5, rely=0.9, anchor='center')
+            check_status.place(relx=0.5, rely = 0.7, anchor= 'center')
+            
+        def getlogin():
+            username = entry_user.get()
+            password = entry_pw.get()
+            # if your want to run the script as it is set validation = True
+            validation = validate(username, password)
+            if validation:
+                tk.messagebox.showinfo("Login Successful",
+                                       "Welcome {}".format(username))
+                top.destroy()
+            else:
+                tk.messagebox.showerror("Information", "The Username or Password you have entered are incorrect ")
+
+        def validate(username, password):
+            # Checks the text file for a username/password combination.
+            try:
+                with open(os.path.join(path,"credentials.csv"), "r") as credentials:
+                    users_data = credentials.read().split("\n")
+                    for user_data in users_data:
+                        user_data = user_data.split(",")
+                        if user_data[0] == username and user_data[1] == password:
+                            return True
+                    return False
+            except FileNotFoundError:
+                print("You need to Register first or amend Line 71 to if True:")
+                return False
+        
+        def signup():
+            # Creates a text file with the Username and password
+            user = entry_user.get()
+            pw = entry_pw.get()
+            validation = validate_user(user)
+            if not validation:
+                tk.messagebox.showerror("Information", "That Username already exists")
+            else:
+                if len(pw) > 3:
+                    credentials = open(os.path.join(path,"credentials.csv"), "a")
+                    status = check_status.get()
+                    credentials.write(f"{user},{pw},{status}\n")
+                    credentials.close()
+                    tk.messagebox.showinfo("Information", "Your account details have been stored.")
+                    login()
+                else:
+                    tk.messagebox.showerror("Information", "Your password needs to be longer than 3 values.")
+
+        def validate_user(username):
+            # Checks the csv file for a username/password combination.
+            try:
+                with open(os.path.join(path,"credentials.csv")) as credentials:
+                    for line in credentials:
+                        line = line.split(",")
+                        if line[0] == username:
+                            return False
+                return True
+            except FileNotFoundError:
+                return True
+        
+        login()
 
 class MenuBar(tk.Menu):
     def __init__(self, parent):
@@ -525,8 +626,6 @@ class P_Test(ctk.CTkFrame):
         _, ent_ext = place_2(0.2,*entry_block(frame4, "select slot: ", spin=True, from_=1, to=5))
         ent_ext.config(command=lambda: Comps.extract.set_slot(int(ent_ext.get())))
         
-
-
 class P_Auto(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)
@@ -1017,7 +1116,9 @@ def control_page():
 
 #---------- GUI Thread -------------#
 def GUI():
-    global gui
+    global gui, top 
+    top = P_Login()
+    top.mainloop()
     gui = Main()
     gui.after(100,task)
     gui.after(200,GUI_Server_Comms)
