@@ -3,7 +3,7 @@ from tkinter import ttk
 from PIL import Image
 import customtkinter as ctk
 import Serial_lib as com 
-from Serial_lib import Pump, Valve, Shutter, Mixer, Vessel, Nano 
+from Serial_lib import Pump, Valve, Shutter, Mixer, Extract, Vessel, Nano
 import os, cv2, time, multiprocessing, random, datetime
 from flask import Flask, render_template, Response, request
 from chump import Application
@@ -174,11 +174,12 @@ def init_module(label=None):
     try: com.CLOSE_SERIAL_PORT(arduinos)
     except: pass
     Ports = com.ID_PORTS_AVAILABLE()
-    arduinos = [0]*5
+    arduinos = [0]*6
     valves = [0]*5
-    pumps = [0]*4
+    pumps = [0]*5
     shutter = 0
     mixer = 0
+    extract = 0
     ves_in = [0]*3
     ves_out = [0]*6
     ves_main = Vessel(0, "ves_main")
@@ -228,7 +229,11 @@ def init_module(label=None):
             arduinos[4].add_component("Shutter Module")
             shutter = Shutter(device, deviceID, 1, buffer)
             mixer = Mixer(device, deviceID, 1, buffer)
-    
+        if deviceID=="1006":
+            arduinos[5] = Nano(device, deviceID, Ports[i])
+            arduinos[5].add_component("Extraction Module")
+            extract = Extract(device, deviceID, 1, buffer, n_slots = 5)
+            pumps[4] = Pump(device, deviceID, 5, buffer)
     for i in range(len(arduinos)):
         try:arduinos.remove(0)
         except:pass
@@ -244,6 +249,7 @@ def init_module(label=None):
     Comps.pumps = pumps         #array
     Comps.mixer = mixer
     Comps.shutter = shutter
+    Comps.extract = extract
     Comps.Temp = [-1]
     Comps.Bubble = [-1]*3
     Comps.LDS = [-1]*4
@@ -582,7 +588,7 @@ class P_Test(ctk.CTkFrame):
         frame3 = Frame(self, text = "Mixer")
         frame3.place(relx=0.825, rely=0.15, relwidth=0.3, relheight=0.38, anchor = 'n')
 
-        frame4= Frame(self, text = "Sensors")
+        frame4= Frame(self, text = "Extract")
         frame4.place(relx=0.825, rely=0.55, relwidth=0.3, relheight=0.4, anchor = 'n')
 
         #box 1 Valve
@@ -616,6 +622,12 @@ class P_Test(ctk.CTkFrame):
         _, ent_mix = place_2(0.2, *entry_block(frame3, "speed : "))
         btn1 = btn(frame3, text="send", command=lambda: Comps.mixer.mix(int(ent_mix.get())))
         btn1.place(relx = 0.5, rely = 0.35, anchor = 'center')
+
+        #box 4 extract
+        _, ent_ext = place_2(0.2,*entry_block(frame4, "select slot: ", spin=True, from_=1, to=5))
+        ent_ext.config(command=lambda: Comps.extract.set_slot(int(ent_ext.get())))
+        
+
 
 class P_Auto(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -868,15 +880,13 @@ class OpenNewWindow(tk.Tk):
         label1.pack(side="top")
 
 def Event(MESSAGES):
-    #MESSAGES can be a list or single element
     for MESSAGE in MESSAGES:
         match MESSAGE[5]:
             case "E":
                 com.Log("ERROR: wrong command sent")
 
             case "V":
-                print("validated: ")
-                arduinos[0].busy()
+                # Command is Valid
                 command = buffer.POP()
                 com.Log(com.DECODE_LINE(command, Comps))
 
@@ -889,14 +899,24 @@ def Event(MESSAGES):
 
 def task():
     global device
+    # Handle multi-arduino two-way communication
     if len(arduinos):
+        # Check if arduinos are not busy and the buffer is not empty
         if (arduinos[0].state==False) and (buffer.Left()>0):
+            # Handle next command in buffer 
+            # command is not removed from buffer yet except for notifications (immidiatly popped)
             buffer.OUT()
+            # if buffer was not blocked and buffer is not empty => arduino command sent to serial 
             if not buffer.blocked and (buffer.Left()>0):
+                # keep track of current device busy
                 device = buffer.READ_DEVICE()
+                # Set all arduinos to busy
                 arduinos[0].busy()
+
+        # wait for response from current device busy
         try:
             if (device.inWaiting() > 0):
+                # handle response from device
                 Event(com.READ(device))
         except:
             pass
@@ -941,10 +961,16 @@ def GUI_Server_Comms():
         command = CMD_rev.recv()
         if command == "PUMP": # if the command is kill
             print("this is a Pump command")
-            Comps.pumps[0].pump(5)
+            try:
+                Comps.pumps[0].pump(5)
+            except:
+                pass
         if command == "Shutter":
             print("This is a shutter command")
-            Comps.shutter.open()
+            try:
+                Comps.shutter.open()
+            except:
+                pass
     elif CMD_rev.poll(timeout=0.1):
         CMD_rev.recv()
     gui.after(200,GUI_Server_Comms) # executes it every 200ms 
@@ -962,15 +988,14 @@ def Main_page():
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
-            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'credentials.csv'), newline='') as login:
                 creds = list(csv.reader(login))
             for creds in creds:
                 if creds[0] == Username:
                     if creds[1] == Password:
                         logged_in.append([request.remote_addr,creds[2]])
                                            
-    if any(request.remote_addr in User for User in logged_in):
-        print(1)          
+    if any(request.remote_addr in User for User in logged_in):    
         # Reads all the current commands in the buffer and addes N/A if blank
         Next =[] # list of next 4 commands
         for i in range(0, 4):
@@ -1008,7 +1033,6 @@ def Main_page():
         return render_template('Main.html', **template) #Renders webpage
                             
     else:
-        print(0)
         template = {
             'address': '/',
         }
@@ -1061,13 +1085,13 @@ def control_page():
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
-            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'credentials.csv'), newline='') as login:
                 creds = list(csv.reader(login))
             for creds in creds:
                 if creds[0] == Username:
                     if creds[1] == Password:
                         logged_in.append([request.remote_addr,creds[2]])
-                        
+
     if any(request.remote_addr in User for User in logged_in):
         if request.method == 'POST':
                 if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
@@ -1091,7 +1115,6 @@ def control_page():
             pass
         return render_template('control.html')          
     else:
-        print(0)
         template = {
             'address': '/',
         }
