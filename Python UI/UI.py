@@ -10,6 +10,7 @@ from chump import Application
 
 #pyinstaller --onedir -w --add-data "c:\users\idan\appdata\local\programs\python\python310\lib\site-packages\customtkinter;customtkinter\" UI.py
 # UI styles 
+
 font_XS = ("Consolas", 15, "normal")
 font_S = ("Consolas", 18, "normal")
 font_M = ("Consolas", 25, "normal")
@@ -519,20 +520,15 @@ class P_Setup(ctk.CTkFrame):
         frame12 = Frame(frame1, text = "", fg_color = 'transparent')
         frame12.place(relx=0, rely=1, relwidth=1, relheight=0.5, anchor = 'sw')
 
-        # frame2 = Frame(self, text = "Pump")
-        # frame2.place(relx=0.5, rely=0.15, relwidth=0.3, relheight=0.8, anchor = 'n')
 
-        # frame3 = Frame(self, text = "Mixer")
-        # frame3.place(relx=0.825, rely=0.15, relwidth=0.3, relheight=0.38, anchor = 'n')
-
-        # frame4= Frame(self, text = "Sensors")
-        # frame4.place(relx=0.825, rely=0.55, relwidth=0.3, relheight=0.4, anchor = 'n')
 
         #box 1 Valve
-        self.label_height, self.ent_height = entry_block(frame = frame1, text="Platform distance from source: ", spin = True, from_ = 41, to_ = 58.5)
-        place_2(rely= 0.2, relx = 0.8, lbl=self.label_height, entry= self.ent_height)
+        self.label_height, self.ent_height = entry_block(frame = frame1, text="Platform distance from source:", spin = True, from_ = 41, to_ = 58.5)
+        place_2(rely= 0.2, relx = 0.7, lbl=self.label_height, entry= self.ent_height)
+        label_cm = ctk.CTkLabel(frame1, text="cm", font=font_S, anchor= "n")
+        label_cm.place(rely= 0.2, relx= 0.9)
 
-        self.label_grey, self.ent_grey = entry_block(frame = frame12, text="Desired dose rate at reactor: ", spin = True) #, from_ = 41, to_ = 58.5)
+        self.label_grey, self.ent_grey = entry_block(frame = frame12, text="Desired dose rate at reactor:", spin = True, from_= 5.52, to_ = 14.57) #, from_ = 41, to_ = 58.5)
         place_2(rely= 0.2, relx = 0.8, lbl=self.label_grey, entry= self.ent_grey)
 
         def update_grey(self):
