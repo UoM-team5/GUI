@@ -882,7 +882,7 @@ logged_in.append(['N/A','N/A'])
 @app.route("/", methods=['GET', 'POST']) # methods of interating and route address
 def Main_page():
     global logged_in
-    if any(request.remote_addr not in User for User in logged_in):
+    if not Check_Creds(request.remote_addr,logged_in,"None"):
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
@@ -893,7 +893,7 @@ def Main_page():
                     if creds[1] == Password:
                         logged_in.append([request.remote_addr,creds[2]])
                                            
-    if any(request.remote_addr in User for User in logged_in):    
+    if Check_Creds(request.remote_addr,logged_in,"None"):    
         # Reads all the current commands in the buffer and addes N/A if blank
         Next =[] # list of next 4 commands
         for i in range(0, 4):
@@ -920,6 +920,13 @@ def Main_page():
         if request.method == 'POST':
                 if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
                     Kill_Conn.send("kill") # Sends kill command on kill pipe
+                if request.form.get('Log Out') == 'Log Out':
+                    print("Remove Login")
+                    logged_in.remove([request.remote_addr,Op_mode(request.remote_addr)])
+                    template = {
+                        'address': '/',
+                    }
+                    return render_template('login.html', **template) #Renders webpage
                 elif request.form.get('Screenshot') == 'Screenshot':
                     frame = web_frame.get()
                     file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_') + ".jpg"
@@ -955,7 +962,7 @@ def gen_frames():
 @app.route('/video_feed')
 def video_feed():
     global logged_in
-    if any(request.remote_addr not in User for User in logged_in):
+    if not Check_Creds(request.remote_addr,logged_in,"None"):
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
@@ -965,21 +972,19 @@ def video_feed():
                 if creds[0] == Username:
                     if creds[1] == Password:
                         logged_in.append([request.remote_addr,creds[2]])
-    if any(request.remote_addr in User for User in logged_in):
+    if Check_Creds(request.remote_addr,logged_in,"None"):
         return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')            
     else:
-        print(0)
         template = {
-            'address': '/',
+            'address': '/video_feed',
         }
         return render_template('login.html', **template) #Renders webpage
-        
 
 #New control page
 @app.route('/control', methods=['GET', 'POST'])
 def control_page():
     global logged_in
-    if any(request.remote_addr not in User for User in logged_in):
+    if not Check_Creds(request.remote_addr,logged_in,"None"):
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
@@ -990,34 +995,60 @@ def control_page():
                     if creds[1] == Password:
                         logged_in.append([request.remote_addr,creds[2]])
 
-    if any(request.remote_addr in User for User in logged_in):
-        if request.method == 'POST':
-                if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
-                    Kill_Conn.send("kill") # Sends kill command on kill pipe
-                    return render_template('control.html')
-                elif request.form.get('Screenshot') == 'Screenshot':
-                    frame = web_frame.get() 
-                    file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_')  + ".jpg"
-                    cv2.imwrite(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'screenshots\\', file_name), frame)
-                elif  request.form.get('Pump') == 'Pump':
-                    print("Pump")
-                    CMD_Conn.send("PUMP")
-                    return render_template('control.html')
-                elif  request.form.get('Shutter') == 'Shutter':
-                    print("Shutter")
-                    CMD_Conn.send("Shutter")
-                    return render_template('control.html')
-                else:
-                    pass
-        elif request.method == 'GET':
-            pass
-        return render_template('control.html')          
+    if Check_Creds(request.remote_addr,logged_in,"None"):
+        if Check_Creds(request.remote_addr,logged_in,"operator"):
+            if request.method == 'POST':
+                    if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
+                        Kill_Conn.send("kill") # Sends kill command on kill pipe
+                        return render_template('control.html')
+                    if request.form.get('Log Out') == 'Log Out':
+                        print("Remove Login")
+                        logged_in.remove([request.remote_addr,Op_mode(request.remote_addr)])
+                        template = {
+                            'address': '/control',
+                        }
+                        return render_template('login.html', **template) #Renders webpage
+                    elif request.form.get('Screenshot') == 'Screenshot':
+                        frame = web_frame.get() 
+                        file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_')  + ".jpg"
+                        cv2.imwrite(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'screenshots\\', file_name), frame)
+                    elif  request.form.get('Pump') == 'Pump':
+                        print("Pump")
+                        CMD_Conn.send("PUMP")
+                        return render_template('control.html')
+                    elif  request.form.get('Shutter') == 'Shutter':
+                        print("Shutter")
+                        CMD_Conn.send("Shutter")
+                        return render_template('control.html')
+                    else:
+                        pass
+            elif request.method == 'GET':
+                pass
+            return render_template('control.html') 
+        else:
+            return render_template('Restricted.html')    
     else:
         template = {
-            'address': '/',
+            'address': '/control',
         }
         return render_template('login.html', **template) #Renders webpage
+    
+def Check_Creds(addr, logged_in, level):
+    print(logged_in)
+    if level == "None":
+        return any(request.remote_addr in User for User in logged_in)
+    for User in logged_in:
+        if User[0] == addr:
+            if User[1] == level:
+                return True
+    return False
 
+def Op_mode(addr):
+    global logged_in
+    for User in logged_in:
+        if User[0] == addr:
+            return User[1]
+        
 #---------- GUI Thread -------------#
 def GUI():
     global gui

@@ -81,6 +81,8 @@ tr:nth-child(even) {
 	position: absolute;
 	top: 10px;
 	right: 10px;
+	width:100px;
+	height: 50px
 }
 
 .buttonK:hover {
@@ -92,7 +94,7 @@ tr:nth-child(even) {
 	background-color: #65656530;
 	border: 1px solid #ff6f00;
 	color: #ff6f00;
-	padding: 16px 32px;
+	padding: 16px ;
 	text-align: center;
 	text-decoration: none;
 	display: inline-block;
@@ -103,6 +105,8 @@ tr:nth-child(even) {
 	position: absolute;
 	top: 10px;
 	left: 10px;
+	width:100px;
+	height: 50px
 }
 
 .buttonC:hover {
@@ -125,9 +129,35 @@ tr:nth-child(even) {
 	position: absolute;
 	top: 10px;
 	left: 10px;
+	width:100px;
+	height: 50px
 }
 
 .buttonH:hover {
 	background-color: #ff6f00;
+	color: white;
+}
+
+.button_Login {
+	background-color: #65656530;
+	border: 1px solid #0008ff;
+	color: #0008ff;
+	padding: 16px ;
+	text-align: center;
+	text-decoration: none;
+	display: inline-block;
+	font-size: 16px;
+	margin: 4px 2px;
+	transition-duration: 0.4s;
+	cursor: pointer;
+	position: absolute;
+	top: 10px;
+	left: 120px;
+	width:100px;
+	height: 50px
+}
+
+.buttonL:hover {
+	background-color: #0008ff;
 	color: white;
 }
