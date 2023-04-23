@@ -434,7 +434,11 @@ class Shutter:
         self.num = component_number
         self.buffer = buffer
         self.state = 0
-         
+    
+    def set_to(self, state: int):
+        if 0<=state<=2:
+            self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S{}]".format(self.ID, self.num, state)])
+
     def close(self):
         self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S1]".format(self.ID, self.num)])
 
@@ -576,7 +580,8 @@ class Buffer:
                     print('Unblocked')
                     self.blocked=False
                     self.POP()
-                    WRITE(*self.buffer[0])
+                    if len(self.buffer):
+                        WRITE(*self.buffer[0])
             
     def POP(self):
         if len(self.buffer):

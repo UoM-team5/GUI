@@ -121,6 +121,15 @@ def place_2(rely, lbl, entry, relx = 0.5):
     entry.place(relx = relx, rely = rely, anchor = 'w')
     return lbl, entry
 
+def place_n(widgets,rely, boundary=(0,1)):
+    #equally distributed widgets across frame 
+    L_bound, R_bound = boundary
+    segment = R_bound-L_bound
+    n = len(widgets)
+    for i in range(len(widgets)):
+        point = segment*(i+1)/(n+1)+L_bound
+        widgets[i].place(relx = point, rely=rely, anchor='center')
+
 def popup(text):
     popup = tk.Tk()
     popup.wm_title("Warning!")
@@ -181,7 +190,11 @@ def init_module(label=None):
     ves_in = [0]*3
     ves_out = [0]*6
     ves_main = Vessel(0, "ves_main")
-
+    with open(os.path.join(path,"hardware.csv"), "r") as hardware:
+        modules_data = hardware.read().split("\n")
+        for module_data in modules_data:
+            module_data = module_data.split(",")
+            print(module_data)
     for i in range(len(Ports)):
         print("\nSource: ", Ports[i])
         device = com.OPEN_SERIAL_PORT(Ports[i])
@@ -201,8 +214,6 @@ def init_module(label=None):
             ves_in[0] = Vessel()
             pumps[0] = Pump(device, deviceID, 1, buffer)
             pumps[1] = Pump(device, deviceID, 2, buffer)
-            shutter = Shutter(device, deviceID, 1, buffer)
-            mixer = Mixer(device, deviceID, 1, buffer)
         if deviceID=="1002":
             arduinos[1] = Nano(device, deviceID, Ports[i])
             arduinos[1].add_component("Input Module 2, pump 2")
@@ -263,7 +274,6 @@ def init_module(label=None):
     except:pass
     print("\n------------ End initialisation --------------\n\n")
 
-
 # UI classes
 class Frame(ctk.CTkFrame):
     def __init__(self, master, text="", **kwargs):
@@ -287,6 +297,8 @@ class P_Login(ctk.CTk):
 
         lbl_user, entry_user = place_2(0.3, *entry_block(frame_login, text = "Username: ", width=100))
         lbl_pw, entry_pw = place_2(0.5, *entry_block(frame_login, text = "Password: ", width=100))
+        entry_user.insert(0, 'Arcadius')
+        entry_pw.insert(0, 'Arcadius')
 
         btn_login = btn(frame_login, text="Login", command=lambda: getlogin())
         btn_register = btn(frame_login, text="Register", command=lambda: go_signup())
@@ -337,7 +349,7 @@ class P_Login(ctk.CTk):
                             return True
                     return False
             except FileNotFoundError:
-                print("You need to Register first or amend Line 71 to if True:")
+                print("You need to Register first")
                 return False
         
         def signup():
@@ -385,14 +397,13 @@ class MenuBar(tk.Menu):
         menu_auto = tk.Menu(self, tearoff=0)
         self.add_cascade(label="Auto", menu=menu_auto)
         menu_auto.add_command(label="MVP",font=('Arial',11), command=lambda: parent.show_frame(P_Auto))
-        menu_auto.add_separator()
+        menu_auto.add_command(label="LEGO",font=('Arial',11), command=lambda: parent.show_frame(P_Code))
         menu_auto.add_command(label="iterate",font=('Arial',11), command=lambda: parent.show_frame(P_Iter))
 
         menu_help = tk.Menu(self, tearoff=0)
         self.add_cascade(label="More", menu=menu_help)
         menu_help.add_command(label="Parameter",font=('Arial',11), command=lambda: parent.show_frame(P_Param))
         menu_help.add_command(label="Open New Window",font=('Arial',11), command=lambda: parent.OpenNewWindow())
-        menu_help.add_command(label="Camera",font=('Arial',11), command=lambda: parent.show_frame(P_Cam))
 
 class Main(ctk.CTk):
     def __init__(self, *args, **kwargs):
@@ -407,7 +418,7 @@ class Main(ctk.CTk):
 
         self.frames = {}
 
-        for F in (P_Init, P_Home, P_Test, P_Auto, P_Iter, P_Hist, P_Param, P_Cam):
+        for F in (P_Init, P_Home, P_Test, P_Auto, P_Code, P_Iter, P_Hist, P_Param):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -483,31 +494,20 @@ class P_Init(ctk.CTkFrame):
 class P_Home(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self, parent)
-        add_image(self, "arcadius.png", relx=0.5, rely=0.05, size=(200,40), anchor = 'n')
+        add_image(self, "arcadius.png", relx=0.5, rely=0.05, size=(300,60), anchor = 'n')
 
-        frame1 = Frame(self, fg_color="transparent")
-        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+        btn1=btn_img(self, "Automate", "auto.png", command=lambda: controller.show_frame(P_Auto))
+        btn2=btn_img(self, "Iterate", "iter.png", command=lambda: controller.show_frame(P_Iter))
+        btn3=btn_img(self, "LEGO", "code.png", command=lambda: controller.show_frame(P_Code))
+        place_n([btn1, btn2, btn3], 0.4, (0.2, 0.8))
 
-        btn1=btn_img(frame1, "Manual", "manual.png", command=lambda: controller.show_frame(P_Test))
-        btn1.place(relx = 0.45, rely = 0.2, anchor = 'e')
-        
-        btn2=btn_img(frame1, "Automate", "auto.png", command=lambda: controller.show_frame(P_Auto))
-        btn2.place(relx = 0.55, rely = 0.2,  anchor = 'w')
+        btn1=btn_img(self, "Manual", "manual.png", command=lambda: controller.show_frame(P_Test))
+        btn2=btn_img(self, "Task", "book.png", command=lambda: controller.show_frame(P_Hist))
+        btn3=btn_img(self, "Parameters", "param.png", command=lambda: controller.show_frame(P_Param))
+        place_n([btn1, btn2, btn3], 0.6, (0.2,0.8))
 
-        btn3=btn_img(frame1, "Task", "book.png", command=lambda: controller.show_frame(P_Hist))
-        btn3.place(relx = 0.45, rely = 0.4, anchor = 'e')
-
-        btn4=btn_img(frame1, "Iterate", "iter.png", command=lambda: controller.show_frame(P_Iter))
-        btn4.place(relx = 0.55, rely = 0.4, anchor = 'w')
-
-        btn5=btn_img(frame1, "Parameters", "param.png", command=lambda: controller.show_frame(P_Param))
-        btn5.place(relx = 0.45, rely = 0.6, anchor = 'e')
-
-        btn4=btn_img(frame1, "Camera", "cam.png", command=lambda: controller.show_frame(P_Cam))
-        btn4.place(relx = 0.55, rely = 0.6, anchor = 'w')
-
-        btn6 = btn(frame1, text="Exit", command=lambda: controller.Quit_application())
-        btn6.place(relx = 0.5, rely = 0.9, anchor = 'center')
+        btn_exit = btn(self, text="Exit", command=lambda: controller.Quit_application())
+        btn_exit.place(relx = 0.5, rely = 0.8, anchor = 'center')
 
 class P_Param(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -594,21 +594,15 @@ class P_Test(ctk.CTkFrame):
         _, ent_valve = place_2(0.2, *entry_block(frame1, "select valve: ", spin=True, from_=1, to=len(Comps.valves)))
 
         btn1 = btn(frame1, text="close", command=lambda: Comps.valves[int(ent_valve.get())-1].close())
-        btn1.place(relx = 0.48, rely = 0.3, anchor = 'e')
         btn2 = btn(frame1, text="open", command=lambda: Comps.valves[int(ent_valve.get())-1].open())
-        btn2.place(relx = 0.52, rely = 0.3, anchor = 'w')
         btn3 = btn(frame1, text="mid", command=lambda: Comps.valves[int(ent_valve.get())-1].mid())
-        btn3.place(relx = 0.5, rely = 0.4, anchor = 'center')
-
+        place_n([btn1, btn2, btn3], rely=0.3)
         #box 1.2 Shutter
         
         btn1 = btn(frame12, text="close", command=lambda: Comps.shutter.close())
-        btn1.place(relx = 0.48, rely = 0.3, anchor = 'e')
         btn2 = btn(frame12, text="open", command=lambda: Comps.shutter.open())
-        btn2.place(relx = 0.52, rely = 0.3, anchor = 'w')
         btn3 = btn(frame12, text="mid", command=lambda: Comps.shutter.mid())
-        btn3.place(relx = 0.5, rely = 0.5, anchor = 'center')
-
+        place_n([btn1, btn2, btn3], rely=0.3)
 
         #box 2 pump
         _, ent_pump = place_2(0.2,*entry_block(frame2, "select pump: ", spin=True, from_=1, to=len(Comps.pumps)))
@@ -692,6 +686,148 @@ class P_Auto(ctk.CTkFrame):
         def update_cam():
             try:
                 if (controller.visible_frame==P_Auto):
+                    controller.get_cam_frame(label, resize = 0.6)
+            except:
+                pass
+            label.after(50, update_cam)
+        update_cam()
+
+class Scratch():
+    def __init__(self, frame, rely):
+        self.rely = rely
+        
+        module_list = ["Input", "Output", "Mix", "Shutter", "Extract", "System"]
+        _, combo = place_2(rely,*entry_block(frame, text="", drop_list=module_list),0.1)
+        combo.configure(command=self.combo_select)
+        self.combo=combo
+
+        In_widgets = [0]*4
+        In_widgets[0], In_widgets[1] = entry_block(frame, "select pump: ", spin=True, from_=1, to=3)
+        In_widgets[2], In_widgets[3] = entry_block(frame, "Volume (ml)")
+        
+        Out_widgets = [0]*4
+        self.out_list = ["Out 1", "Out 2", "Out 3", "Out 4", "Out 5", "Out 6"]
+        Out_widgets[0], Out_widgets[1] = entry_block(frame, text="Select Output", drop_list=self.out_list)
+        Out_widgets[2], Out_widgets[3] = entry_block(frame, "Volume (ml)")
+
+        mix_widgets = [0]*2
+        mix_widgets[0], mix_widgets[1] = entry_block(frame, text="Speed")
+
+        shutter_widgets = [0]*2
+        shutter_list = ["Open", "close", "mid"]
+        shutter_widgets[0], shutter_widgets[1] = entry_block(frame, text="mode", drop_list=shutter_list)
+
+        Ext_widgets = [0]*4
+        Ext_widgets[0], Ext_widgets[1] = entry_block(frame, "select slot: ", spin=True, from_=1, to=5)
+        Ext_widgets[2], Ext_widgets[3] = entry_block(frame, "Volume (ml)")
+
+        system_widgets = [0]*2
+        system_widgets[0], system_widgets[1] = entry_block(frame, text="Block time (s)")
+
+        self.In_widgets = In_widgets
+        self.Out_widgets = Out_widgets
+        self.mix_widgets = mix_widgets
+        self.shutter_widgets = shutter_widgets
+        self.Ext_widgets = Ext_widgets
+        self.system_widgets = system_widgets
+        self.all_widgets = In_widgets+Out_widgets+mix_widgets+shutter_widgets+system_widgets
+        self.combo_select(combo.get())
+
+        self.current_widgets=self.In_widgets
+    
+    def combo_select(self, selected):
+        for w in self.all_widgets:
+            w.place_forget()
+        if selected=="Input":     current_widgets = self.In_widgets
+        elif selected=="Output":  current_widgets = self.Out_widgets
+        elif selected=="Mix":     current_widgets = self.mix_widgets
+        elif selected=="Shutter": current_widgets = self.shutter_widgets
+        elif selected=="Extract": current_widgets = self.Out_widgets
+        elif selected=="System":  current_widgets = self.system_widgets
+        
+        self.current_widgets = current_widgets
+        place_n(self.current_widgets, rely=self.rely, boundary=(0.2,1))
+
+    def send_command(self):
+        selected = self.combo.get()
+        print(selected)
+        if selected=="Input":     
+            num = int(self.In_widgets[1].get())
+            vol = float(self.In_widgets[3].get())
+            Comps.pumps[num].pump(vol)
+        elif selected=="Output":  
+            state = self.out_list.index(self.Out_widgets[1].get())
+            vol = float(self.Out_widgets[3].get())
+            com.valve_states(Comps.valves, state)
+            Comps.pumps[3].pump(vol)
+        elif selected=="Mix":     
+            Comps.mixer.mix(int(self.mix_widgets[1].get()))
+        elif selected=="Shutter": 
+            state = self.out_list.index(self.shutter_widgets[1].get())
+            Comps.shutter.set_to(state)
+        elif selected=="Extract": 
+            state = int(self.Ext_widgets[1].get())
+            vol = float(self.Ext_widgets[3].get())
+            Comps.extract.set_slot(state)
+            Comps.pumps[4].pump(vol)
+        elif selected=="System":  
+            time = float(self.system_widgets[1].get())
+            Comps.buffer.BLOCK(time)
+    
+    def delete(self):
+        self.combo.place_forget()
+        for w in self.all_widgets:
+            w.place_forget()
+        del self
+
+class P_Code(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        ctk.CTkFrame.__init__(self,parent)
+        title = ctk.CTkLabel(self, text = "Modular", font=font_L)
+        title.place(relx = 0.5, rely = 0.1, anchor = 'center')
+
+        frame1 = Frame(self)
+        frame1.place(relx= 0.6, rely = 0.55, relwidth=0.55, relheight=0.8, anchor = 'e')
+        frame2 = Frame(self, fg_color = 'transparent')
+        frame2.place(relx= 0.6, rely = 0.55, relwidth=0.4, relheight=0.8, anchor = 'w')
+        scratch_rows = [Scratch(frame1, 1/15)]
+        Pbar = ProgressBar(frame2, buffer)
+
+        def new_row():
+            rely = (len(scratch_rows)+1)/15
+            scratch_rows.append(Scratch(frame1, rely))
+        def start_experiment():
+            for scratch_row in scratch_rows:
+                scratch_row.send_command()
+            Pbar.SET(buffer.Left())
+        def delete_row():
+            scratch_rows.pop(-1).delete()
+
+        btn_minus = btn_img(frame1, text="remove step", file_name='minus.png', command=lambda: delete_row())    
+        btn_start = btn(frame1, text="Start", width = 100, height=35, command=lambda: start_experiment(), font=font_S)
+        btn_plus = btn_img(frame1, text="add step", file_name='plus.png', command=lambda: new_row())
+        
+        place_n([btn_minus, btn_start, btn_plus], 0.9)
+        # buffer list
+
+        textbox = ctk.CTkTextbox(frame2,width=300, height=200, state= 'normal')
+        textbox.place(relx=0.5, rely=0, anchor="n")
+        def update_buffer():
+            try:
+                if (controller.visible_frame==P_Code):
+                    controller.update_buffer_list(textbox)
+                    Pbar.refresh()
+            except:
+                pass
+            textbox.after(500, update_buffer)
+        update_buffer()
+
+        #camera
+        label = ctk.CTkLabel(frame2, text="")
+        label.place(relx = 0.5, rely = 1, anchor = 's')
+        def update_cam():
+            try:
+                if (controller.visible_frame==P_Code):
                     controller.get_cam_frame(label, resize = 0.6)
             except:
                 pass
@@ -839,23 +975,6 @@ class P_Hist(ctk.CTkFrame):
             textbox.after(500, update_page)
         update_page()
 
-class P_Cam(ctk.CTkFrame):
-    def __init__(self, parent, controller):
-        ctk.CTkFrame.__init__(self,parent)
-        
-        label = ctk.CTkLabel(self, text="")
-        label.place(relx = 0.5, rely = 0.5, anchor = 'center')
-    
-
-        def update_cam():
-            try: 
-                if (controller.visible_frame==P_Cam):
-                    controller.get_cam_frame(label)
-            except:
-                pass
-            label.after(50, update_cam)
-        update_cam()
- 
 class OpenNewWindow(tk.Tk):
     def __init__(self, *args, **kwargs):
 
