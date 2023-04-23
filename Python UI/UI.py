@@ -128,7 +128,9 @@ def place_n(widgets,rely, boundary=(0,1)):
     n = len(widgets)
     for i in range(len(widgets)):
         point = segment*(i+1)/(n+1)+L_bound
-        widgets[i].place(relx = point, rely=rely, anchor='center')
+        try:
+            widgets[i].place(relx = point, rely=rely, anchor='center')
+        except:pass
 
 def popup(text):
     popup = tk.Tk()
@@ -702,26 +704,27 @@ class Scratch():
         self.combo=combo
 
         In_widgets = [0]*4
+        Out_widgets = [0]*4
+        mix_widgets = [0]*4
+        shutter_widgets = [0]*4
+        Ext_widgets = [0]*4
+        system_widgets = [0]*4
+
         In_widgets[0], In_widgets[1] = entry_block(frame, "select pump: ", spin=True, from_=1, to=3)
         In_widgets[2], In_widgets[3] = entry_block(frame, "Volume (ml)")
         
-        Out_widgets = [0]*4
         self.out_list = ["Out 1", "Out 2", "Out 3", "Out 4", "Out 5", "Out 6"]
         Out_widgets[0], Out_widgets[1] = entry_block(frame, text="Select Output", drop_list=self.out_list)
         Out_widgets[2], Out_widgets[3] = entry_block(frame, "Volume (ml)")
-
-        mix_widgets = [0]*2
+        
         mix_widgets[0], mix_widgets[1] = entry_block(frame, text="Speed")
-
-        shutter_widgets = [0]*2
+        
         shutter_list = ["Open", "close", "mid"]
         shutter_widgets[0], shutter_widgets[1] = entry_block(frame, text="mode", drop_list=shutter_list)
-
-        Ext_widgets = [0]*4
+        
         Ext_widgets[0], Ext_widgets[1] = entry_block(frame, "select slot: ", spin=True, from_=1, to=5)
         Ext_widgets[2], Ext_widgets[3] = entry_block(frame, "Volume (ml)")
-
-        system_widgets = [0]*2
+        
         system_widgets[0], system_widgets[1] = entry_block(frame, text="Block time (s)")
 
         self.In_widgets = In_widgets
@@ -737,7 +740,10 @@ class Scratch():
     
     def combo_select(self, selected):
         for w in self.all_widgets:
-            w.place_forget()
+            try: 
+                w.place_forget()
+            except AttributeError: 
+                pass
         if selected=="Input":     current_widgets = self.In_widgets
         elif selected=="Output":  current_widgets = self.Out_widgets
         elif selected=="Mix":     current_widgets = self.mix_widgets
@@ -777,7 +783,10 @@ class Scratch():
     def delete(self):
         self.combo.place_forget()
         for w in self.all_widgets:
-            w.place_forget()
+            try: 
+                w.place_forget()
+            except AttributeError:
+                pass
         del self
 
 class P_Code(ctk.CTkFrame):
@@ -997,20 +1006,24 @@ class OpenNewWindow(tk.Tk):
 
 def Event(MESSAGES):
     for MESSAGE in MESSAGES:
-        match MESSAGE[5]:
-            case "E":
-                com.Log("ERROR: wrong command sent")
+        try:
+            match MESSAGE[5]:
+                
+                case "E":
+                    com.Log("ERROR: wrong command sent")
 
-            case "V":
-                # Command is Valid
-                command = buffer.POP()
-                com.Log(com.DECODE_LINE(command, Comps))
+                case "V":
+                    # Command is Valid
+                    command = buffer.POP()
+                    com.Log(com.DECODE_LINE(command, Comps))
 
-            case "F":
-                arduinos[0].free()
-                    
-            case _:
-                pass
+                case "F":
+                    arduinos[0].free()
+                        
+                case _:
+                    pass
+        except IndexError: 
+            pass
     return
 
 def task():
