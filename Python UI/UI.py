@@ -13,6 +13,7 @@ log.setLevel(logging.ERROR)
 
 #pyinstaller --onedir -w --add-data "c:\users\idan\appdata\local\programs\python\python310\lib\site-packages\customtkinter;customtkinter\" UI.py
 # UI styles 
+
 font_XS = ("Consolas", 15, "normal")
 font_S = ("Consolas", 18, "normal")
 font_M = ("Consolas", 25, "normal")
@@ -396,6 +397,8 @@ class MenuBar(tk.Menu):
 
         self.add_command(label="Manual", command=lambda: parent.show_frame(P_Test))
 
+        self.add_command(label="Cabinet Setup", command=lambda: parent.show_frame(P_Setup))
+
         menu_auto = tk.Menu(self, tearoff=0)
         self.add_cascade(label="Auto", menu=menu_auto)
         menu_auto.add_command(label="MVP",font=('Arial',11), command=lambda: parent.show_frame(P_Auto))
@@ -420,7 +423,7 @@ class Main(ctk.CTk):
 
         self.frames = {}
 
-        for F in (P_Init, P_Home, P_Test, P_Auto, P_Code, P_Iter, P_Hist, P_Param):
+        for F in (P_Init, P_Home, P_Test, P_Auto, P_Code, P_Iter, P_Hist, P_Param, P_Setup):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -622,6 +625,50 @@ class P_Test(ctk.CTkFrame):
         _, ent_ext = place_2(0.2,*entry_block(frame4, "select slot: ", spin=True, from_=1, to=5))
         ent_ext.config(command=lambda: Comps.extract.set_slot(int(ent_ext.get())))
         
+class P_Setup(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        ctk.CTkFrame.__init__(self,parent)
+        title = ctk.CTkLabel(self, text = "Cabinet Setup", font=font_L)
+        title.place(relx = 0.5, rely = 0.05, anchor = 'center')
+        
+        frame1 = Frame(self, text = "")
+        frame1.place(relx=0.175, rely=0.15, relwidth=0.3, relheight=0.8, anchor = 'n')
+        frame12 = Frame(frame1, text = "", fg_color = 'transparent')
+        frame12.place(relx=0, rely=1, relwidth=1, relheight=0.5, anchor = 'sw')
+
+
+
+        #box 1 Valve
+        self.label_height, self.ent_height = entry_block(frame = frame1, text="Platform distance from source:", spin = True, from_ = 41, to_ = 58.5)
+        place_2(rely= 0.2, relx = 0.7, lbl=self.label_height, entry= self.ent_height)
+        label_cm = ctk.CTkLabel(frame1, text="cm", font=font_S, anchor= "n")
+        label_cm.place(rely= 0.2, relx= 0.9)
+
+        self.label_grey, self.ent_grey = entry_block(frame = frame12, text="Desired dose rate at reactor:", spin = True, from_= 5.52, to_ = 14.57) #, from_ = 41, to_ = 58.5)
+        place_2(rely= 0.2, relx = 0.8, lbl=self.label_grey, entry= self.ent_grey)
+
+        def update_grey(self):
+            x = float(self.ent_height.get())
+            y = round(17745/((x-11.3)**2.095), 2)
+            self.ent_grey.set(y)
+
+        def update_height(self):
+            x = float(self.ent_grey.get())
+            y = round((106.82/(x**0.477))+11.3, 2)
+            self.ent_height.set(y)
+
+        btn_grey = btn(frame1, text="Convert Height to Dose rate", command= lambda: update_grey(self))
+        btn_grey.place(relx = 0.5, rely = 0.3, anchor = 'center')
+
+        btn_height = btn(frame12, text="Convert Dose rate to Height", command= lambda: update_height(self))
+        btn_height.place(relx = 0.5, rely = 0.3, anchor = 'center')
+
+                
+
+       
+
+       
+
 class P_Auto(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)

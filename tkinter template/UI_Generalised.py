@@ -4,17 +4,17 @@ import serial
 import time
 
 # uncomment next line for arduino comm
-try:
-    arduino = serial.Serial(port='COM6', baudrate=9600, timeout=.1)
-except:
-    pass
-arduino_servo = serial.Serial(port='COM7', baudrate=115200, timeout=.1)
+# try:
+#     arduino = serial.Serial(port='COM6', baudrate=9600, timeout=.1)
+# except:
+#     pass
+# arduino_servo = serial.Serial(port='COM7', baudrate=115200, timeout=.1)
 
 # Send stuff to arduino through Serial
 def write(x):
     # UNcomment 2 next lines for arduino comm
-    arduino.write(bytes(x, 'utf-8'))
-    time.sleep(0.05)
+    # arduino.write(bytes(x, 'utf-8'))
+    # time.sleep(0.05)
     print(x)
 
 value = ''
