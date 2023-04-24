@@ -118,7 +118,7 @@ tr:nth-child(even) {
 	background-color: #65656530;
 	border: 1px solid #ff6f00;
 	color: #ff6f00;
-	padding: 16px 32px;
+	padding: 16px ;
 	text-align: center;
 	text-decoration: none;
 	display: inline-block;
@@ -160,4 +160,36 @@ tr:nth-child(even) {
 .buttonL:hover {
 	background-color: #0008ff;
 	color: white;
+}
+
+warning{
+	color: #f44336;
+	text-align: center;
+	margin-top: 400px;
+	height: 100%;
+}
+
+.centered {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.footer{
+	text-align: center;
+	position:fixed;
+	bottom:0;
+	left:0;
+	width: 100%;
+	background-color: #d0d0d0d0;
+}
+
+.email{
+	float: right; 
+	font-size: small; 
+	padding-right: 30px; 
+	text-align: center;
+	padding-top: 14px;
 }

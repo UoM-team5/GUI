@@ -1034,7 +1034,6 @@ def control_page():
         return render_template('login.html', **template) #Renders webpage
     
 def Check_Creds(addr, logged_in, level):
-    print(logged_in)
     if level == "None":
         return any(request.remote_addr in User for User in logged_in)
     for User in logged_in:
