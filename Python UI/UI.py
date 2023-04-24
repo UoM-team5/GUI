@@ -35,7 +35,7 @@ class ProgressBar():
         self.n_tasks = n_tasks
     
     def refresh(self):
-        ratio = (self.n_tasks-self.buffer.Left())/self.n_tasks
+        ratio = (self.n_tasks-self.buffer.Length())/self.n_tasks
         self.Pbar.set(ratio)
         if ratio==1:
             self.Pbar.place_forget()
@@ -178,6 +178,7 @@ def check_isnumber(value, type = 'float'):
 com.delete_file()
 phone = com.notif()
 buffer = com.Buffer()
+radiate = com.Cabin()
 Comps = com.Components()
 def init_module(label=None):
     global arduinos, device
@@ -262,6 +263,7 @@ def init_module(label=None):
     Comps.mixer = mixer
     Comps.shutter = shutter
     Comps.extract = extract
+    Comps.radiate = radiate
     Comps.Temp = [-1]
     Comps.Bubble = [-1]*3
     Comps.LDS = [-1]*4
@@ -394,16 +396,9 @@ class MenuBar(tk.Menu):
         self.configure(background= 'blue', fg='red')
 
         self.add_command(label="Home", command=lambda: parent.show_frame(P_Home))
-
-        self.add_command(label="Manual", command=lambda: parent.show_frame(P_Test))
-
-        self.add_command(label="Cabinet Setup", command=lambda: parent.show_frame(P_Setup))
-
-        menu_auto = tk.Menu(self, tearoff=0)
-        self.add_cascade(label="Auto", menu=menu_auto)
-        menu_auto.add_command(label="MVP",font=('Arial',11), command=lambda: parent.show_frame(P_Auto))
-        menu_auto.add_command(label="LEGO",font=('Arial',11), command=lambda: parent.show_frame(P_Code))
-        menu_auto.add_command(label="iterate",font=('Arial',11), command=lambda: parent.show_frame(P_Iter))
+        self.add_command(label="Control", command=lambda: parent.show_frame(P_Auto))
+        self.add_command(label="Iterative", command=lambda: parent.show_frame(P_Iter))
+        self.add_command(label="LEGO", command=lambda: parent.show_frame(P_Code))
 
         menu_help = tk.Menu(self, tearoff=0)
         self.add_cascade(label="More", menu=menu_help)
@@ -423,7 +418,7 @@ class Main(ctk.CTk):
 
         self.frames = {}
 
-        for F in (P_Init, P_Home, P_Test, P_Auto, P_Code, P_Iter, P_Hist, P_Param, P_Setup):
+        for F in (P_Init, P_Home, P_Test, P_Auto, P_Code, P_Iter, P_Hist, P_Param):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -524,19 +519,46 @@ class P_Param(ctk.CTkFrame):
         tabs.place(relx = 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
 
         frame_vessel = Frame(tabs.tab("Module"), text="Vessel levels")
-        frame_vessel.place(relx= 0.7, rely = 0.5, relwidth=0.3, relheight=0.4, anchor = 'center')
+        frame_vessel.place(relx= 0.7, rely = 0.25, relwidth=0.3, relheight=0.4, anchor = 'center')
 
         frame_nano = Frame(tabs.tab("Module"), text="Arduinos")
-        frame_nano.place(relx= 0.3, rely = 0.5, relwidth=0.3, relheight=0.4, anchor = 'center')
+        frame_nano.place(relx= 0.3, rely = 0.25, relwidth=0.3, relheight=0.4, anchor = 'center')
+
+        frame_cabinet = Frame(tabs.tab("Module"), text="Cabinet")
+        frame_cabinet.place(relx= 0.3, rely = 0.75, relwidth=0.3, relheight=0.3, anchor = 'center')
         
         frame_push = Frame(tabs.tab("Interface"), text="Push notification")
         frame_push.place(relx= 0.5, rely = 0.5, relwidth=0.4, relheight=0.3, anchor = 'center')
+
         #arduino
-        
         details = ctk.CTkLabel(frame_nano, font=font_XS, text='\n'.join(Comps.modules),justify= 'left')
         details.place(relx = 0.5, rely = 0.5, anchor = 'center') 
         btn_flush = btn(frame_nano, text = 'reset', command=lambda: init_module(details))
         btn_flush.place(relx=0.5, rely=0.1, anchor='center')
+
+        # cabinet
+        _, ent_height = place_2(0.5, *entry_block(frame_cabinet,'Cabinet height:'), 0.7)
+        ent_height.insert(0, str(Comps.radiate.cabin_height))
+        btn_save = btn(frame_cabinet, text ='save', command=lambda: Comps.radiate.set_cabin_height(float(ent_height.get())))
+        btn_save.place(relx = 0.5, rely = 0.8, anchor = 'center')
+
+        # vessels
+        n = 3
+        ent_Rname = [0]*n
+        ent_Rvol = [0]*n
+        names, volumes =  com.read_detail('details.csv')
+        for i in range(n):
+            if i==0: text = 'A'
+            elif i==1: text = 'B'
+            elif i==2: text = 'C'
+            _, ent_Rname[i] = place_2(0.2 + 0.2*i, *entry_block(frame_vessel, text=text), relx = 0.25)
+            _, ent_Rvol[i]  = place_2(0.2 + 0.2*i, *entry_block(frame_vessel, text=(' Vol: ')), relx = 0.75)
+           
+            ent_Rname[i].insert(0,names[i])
+            ent_Rvol[i].insert(0,volumes[i])
+
+        btn1 = btn(frame_vessel, text ='save', command=lambda: com.vessel_detail(ent_Rname, ent_Rvol))
+        btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
 
         # interface
         mode_switch = ctk.CTkSwitch(master=tabs.tab("Interface"), text="Dark Mode", command=lambda: set_mode(mode_switch.get()), onvalue=1, offvalue=0)
@@ -556,24 +578,6 @@ class P_Param(ctk.CTkFrame):
         ent_user.configure(width=200)
         ent_app.insert(0, phone.app_token)
         ent_user.insert(0, phone.user_key)
-
-        # vessels
-        n = 3
-        ent_Rname = [0]*n
-        ent_Rvol = [0]*n
-        names, volumes =  com.read_detail('details.csv')
-        for i in range(n):
-            if i==0: text = 'A'
-            elif i==1: text = 'B'
-            elif i==2: text = 'C'
-            _, ent_Rname[i] = place_2(0.2 + 0.2*i, *entry_block(frame_vessel, text=text), relx = 0.25)
-            _, ent_Rvol[i]  = place_2(0.2 + 0.2*i, *entry_block(frame_vessel, text=(' Vol: ')), relx = 0.75)
-           
-            ent_Rname[i].insert(0,names[i])
-            ent_Rvol[i].insert(0,volumes[i])
-
-        btn1 = btn(frame_vessel, text ='save', command=lambda: com.vessel_detail(ent_Rname, ent_Rvol))
-        btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
 
 class P_Test(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -625,50 +629,6 @@ class P_Test(ctk.CTkFrame):
         _, ent_ext = place_2(0.2,*entry_block(frame4, "select slot: ", spin=True, from_=1, to=5))
         ent_ext.config(command=lambda: Comps.extract.set_slot(int(ent_ext.get())))
         
-class P_Setup(ctk.CTkFrame):
-    def __init__(self, parent, controller):
-        ctk.CTkFrame.__init__(self,parent)
-        title = ctk.CTkLabel(self, text = "Cabinet Setup", font=font_L)
-        title.place(relx = 0.5, rely = 0.05, anchor = 'center')
-        
-        frame1 = Frame(self, text = "")
-        frame1.place(relx=0.175, rely=0.15, relwidth=0.3, relheight=0.8, anchor = 'n')
-        frame12 = Frame(frame1, text = "", fg_color = 'transparent')
-        frame12.place(relx=0, rely=1, relwidth=1, relheight=0.5, anchor = 'sw')
-
-
-
-        #box 1 Valve
-        self.label_height, self.ent_height = entry_block(frame = frame1, text="Platform distance from source:", spin = True, from_ = 41, to_ = 58.5)
-        place_2(rely= 0.2, relx = 0.7, lbl=self.label_height, entry= self.ent_height)
-        label_cm = ctk.CTkLabel(frame1, text="cm", font=font_S, anchor= "n")
-        label_cm.place(rely= 0.2, relx= 0.9)
-
-        self.label_grey, self.ent_grey = entry_block(frame = frame12, text="Desired dose rate at reactor:", spin = True, from_= 5.52, to_ = 14.57) #, from_ = 41, to_ = 58.5)
-        place_2(rely= 0.2, relx = 0.8, lbl=self.label_grey, entry= self.ent_grey)
-
-        def update_grey(self):
-            x = float(self.ent_height.get())
-            y = round(17745/((x-11.3)**2.095), 2)
-            self.ent_grey.set(y)
-
-        def update_height(self):
-            x = float(self.ent_grey.get())
-            y = round((106.82/(x**0.477))+11.3, 2)
-            self.ent_height.set(y)
-
-        btn_grey = btn(frame1, text="Convert Height to Dose rate", command= lambda: update_grey(self))
-        btn_grey.place(relx = 0.5, rely = 0.3, anchor = 'center')
-
-        btn_height = btn(frame12, text="Convert Dose rate to Height", command= lambda: update_height(self))
-        btn_height.place(relx = 0.5, rely = 0.3, anchor = 'center')
-
-                
-
-       
-
-       
-
 class P_Auto(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)
@@ -684,7 +644,7 @@ class P_Auto(ctk.CTkFrame):
         _, ent_P[0] = place_2(0.2, *entry_block(frame1, text="Input A (ml)"))
         _, ent_P[1] = place_2(0.3, *entry_block(frame1, text="Input B (ml)"))
         _, ent_P[2] = place_2(0.4, *entry_block(frame1, text="Input C (ml)"))
-        _, ent_I = place_2(0.5, *entry_block(frame1, text="shutter time (s)"))
+        _, ent_I = place_2(0.5, *entry_block(frame1, text="Total dosage (Gy)"))
         
         out_list = ["Input A", "Input B", "Product", "Waste", "Recycle", "Recycle 2"]
         _, sel_output = place_2(0.6, *entry_block(frame1, text="Select Output", drop_list=out_list))
@@ -703,10 +663,13 @@ class P_Auto(ctk.CTkFrame):
                     tot_vol+=vol
                     Comps.pumps[i].pump(vol)
                 except:pass
+            try:Comps.shutter.open()
+            except:pass
             try:
-                Comps.shutter.open()
-                Comps.buffer.BLOCK(float(ent_I.get()))
-                Comps.shutter.close()
+                time = Comps.radiate.D2T(float(ent_I.get()))
+                Comps.buffer.BLOCK(time)
+            except:pass
+            try:Comps.shutter.close()
             except:pass
 
             try:
@@ -714,7 +677,7 @@ class P_Auto(ctk.CTkFrame):
                 Comps.pumps[3].pump(tot_vol+10)
             except:pass
             buffer.NOTIFY('Experiment Over')
-            Pbar.SET(buffer.Left())
+            Pbar.SET(buffer.Length())
        
         # buffer list
         textbox = ctk.CTkTextbox(frame2,width=300, height=200, state= 'normal')
@@ -795,7 +758,7 @@ class Scratch():
         elif selected=="Output":  current_widgets = self.Out_widgets
         elif selected=="Mix":     current_widgets = self.mix_widgets
         elif selected=="Shutter": current_widgets = self.shutter_widgets
-        elif selected=="Extract": current_widgets = self.Out_widgets
+        elif selected=="Extract": current_widgets = self.Ext_widgets
         elif selected=="System":  current_widgets = self.system_widgets
         
         self.current_widgets = current_widgets
@@ -803,7 +766,6 @@ class Scratch():
 
     def send_command(self):
         selected = self.combo.get()
-        print(selected)
         if selected=="Input":     
             num = int(self.In_widgets[1].get())
             vol = float(self.In_widgets[3].get())
@@ -855,7 +817,7 @@ class P_Code(ctk.CTkFrame):
         def start_experiment():
             for scratch_row in scratch_rows:
                 scratch_row.send_command()
-            Pbar.SET(buffer.Left())
+            Pbar.SET(buffer.Length())
         def delete_row():
             scratch_rows.pop(-1).delete()
 
@@ -911,7 +873,7 @@ class P_Iter(ctk.CTkFrame):
         _, ent_volC = place_2(0.4, *entry_block(frame1, "C (ml):"), 0.4)
         _, ent_stepC = place_2(0.4, *entry_block(frame1, " + it x", spin=True, from_=-20, wrap=False, increment = 0.1), 0.7)
         ent_stepC.set(0)
-        _, ent_Shut= place_2(0.5, *entry_block(frame1, "shutter time:"), 0.4)
+        _, ent_Shut= place_2(0.5, *entry_block(frame1, "Dosage (Gy):"), 0.4)
         _, ent_step_Shut = place_2(0.5, *entry_block(frame1, " + it x", spin=True, wrap=False, from_=0), 0.7)
 
         _, ent_count = place_2(0.6, *entry_block(frame1, "number of iterations:", spin=True, from_=1, to=10))
@@ -954,8 +916,8 @@ class P_Iter(ctk.CTkFrame):
             Rb_step = ent_stepB.get()
             Rc = ent_volC.get()
             Rc_step = ent_stepC.get()
-            time = ent_Shut.get()
-            time_step = ent_step_Shut.get()
+            dosage = ent_Shut.get()
+            dosage_step = ent_step_Shut.get()
             count = int(ent_count.get())
 
             for i in range(count):
@@ -965,10 +927,11 @@ class P_Iter(ctk.CTkFrame):
                     Comps.pumps[1].pump(float(Rb) + float(Rb_step)*i)
                 if Rc!="" and Rc_step!="":
                     Comps.pumps[2].pump(float(Rc) + float(Rc_step)*i)
-                if time!="" and time_step!="":
+                if dosage!="" and dosage_step!="":
                     try:
                         Comps.shutter.open()
-                        Comps.buffer.BLOCK(float(time)+float(time_step)*i)
+                        time = Comps.radiate.D2T(float(dosage)+float(dosage_step)*i)
+                        Comps.buffer.BLOCK(time)
                         Comps.shutter.close()
                     except:pass
                 try:
@@ -976,7 +939,7 @@ class P_Iter(ctk.CTkFrame):
                     Comps.pumps[3].pump(10)
                 except:pass
 
-            Pbar.SET(buffer.Left())
+            Pbar.SET(buffer.Length())
             buffer.NOTIFY('Iterations Over')
       
 class P_Hist(ctk.CTkFrame):
@@ -1078,16 +1041,17 @@ def task():
     # Handle multi-arduino two-way communication
     if len(arduinos):
         # Check if arduinos are not busy and the buffer is not empty
-        if (arduinos[0].state==False) and (buffer.Left()>0):
+        if (arduinos[0].state==False) and (buffer.Length()>0):
             # Handle next command in buffer 
             # command is not removed from buffer yet except for notifications (immidiatly popped)
             buffer.OUT()
             # if buffer was not blocked and buffer is not empty => arduino command sent to serial 
-            if not buffer.blocked and (buffer.Left()>0):
+            if not buffer.blocked and (buffer.Length()>0):
                 # keep track of current device busy
                 device = buffer.READ_DEVICE()
-                # Set all arduinos to busy
-                arduinos[0].busy()
+                if device!='NOTIF': 
+                    # Set all arduinos to busy
+                    arduinos[0].busy()
 
         # wait for response from current device busy
         try:
