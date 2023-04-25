@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+  <script>
+    function table_update() {
+      $(document).ready(function () {
+          $.ajax({
+            url: '/command',
+            success: function (data) {
+              $('#current').html($(data).find("#current"));
+              $('#Next1').html($(data).find("#N1"));
+              $('#Next2').html($(data).find("#N2"));
+              $('#Next3').html($(data).find("#N3"));
+              $('#Next4').html($(data).find("#N4"));
+            },
+            error: function () {
+              $("#Dialog").dialog('open');
+            }
+          });
+        });
+      setTimeout(table_update, 1000);
+    }
+    table_update();
+  </script>
+</head>
+
+<body>
+  <div id="current"></div><br><br>
+  <div id="Next1">
+    <h2>Let jQuery AJAX Change This Text</h2>
+  </div>
+  <div id="Next2">
+    <h2>Let jQuery AJAX Change This Text</h2>
+  </div>
+  <div id="Next3">
+    <h2>Let jQuery AJAX Change This Text</h2>
+  </div>
+  <div id="Next4">
+    <h2>Let jQuery AJAX Change This Text</h2>
+  </div>
+
+  <button>Get External Content</button>
+  <dialog>error</dialog>
+</body>
+
+</html>

@@ -4,6 +4,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <head>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+	<script>
+		function table_update() {
+			$(document).ready(function () {
+				$.ajax({
+					url: '/command',
+					success: function (data) {
+						$('#timer').html(data);
+						$('#current').html($(data).find("#current"));
+						$('#Next1').html($(data).find("#N1"));
+						$('#Next2').html($(data).find("#N2"));
+						$('#Next3').html($(data).find("#N3"));
+						$('#Next4').html($(data).find("#N4"));
+					},
+					error: function () {
+						$("#Dialog").dialog('open');
+					}
+				});
+			});
+			setTimeout(table_update, 500);
+		}
+		table_update();
+	</script>
 	<title>
 		{{title}}
 	</title>
@@ -35,28 +58,38 @@
 								<th>Next Command</th>
 							</tr>
 							<tr>
-								<td>{{Current}}</td>
-								<td>{{N1}}</td>
+								<td>
+									<div id="current">{{Current}}</div>
+								</td>
+								<td>
+									<div id="Next1">{{N1}}</div>
+								</td>
 							</tr>
 							<tr>
 								<td> </td>
-								<td>{{N2}}</td>
+								<td>
+									<div id="Next2">{{N2}}</div>
+								</td>
 							</tr>
 							<tr>
 								<td> </td>
-								<td>{{N3}}</td>
+								<td>
+									<div id="Next3">{{N3}}</div>
+								</td>
 							</tr>
 							<tr>
 								<td> </td>
-								<td>{{N4}}</td>
+								<td>
+									<div id="Next4">{{N4}}</div>
+								</td>
 							</tr>
 						</table>
 					</section>
 				</div>
 			</section>
 		</Monitor>
+		<dialog>Error in loading from command</dialog>
 	</section>
-
 </head>
 
 <body>
@@ -75,7 +108,8 @@
 <meta http-equiv="refresh" content="100000000">
 
 <footer class="footer">
-	<p style="float: left; font-size: small; padding-left: 30px; text-align: center;">Copyright © 2023 Arcadius.     All Rights Reserved.</p>
+	<p style="float: left; font-size: small; padding-left: 30px; text-align: center;">Copyright © 2023 Arcadius. All
+		Rights Reserved.</p>
 	<a class="email" href="mailto:arcadius.uom@gmail.com">Arcadius.UOM@gmail.com</a>
 </footer>
 

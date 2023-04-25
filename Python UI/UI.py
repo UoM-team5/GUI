@@ -959,7 +959,7 @@ def gen_frames():
             pass
            
 #Renders a webpage fro pure video streaming which is linked to on main page
-@app.route('/video_feed')
+@app.route('/video_feed', methods=['GET', 'POST'])
 def video_feed():
     global logged_in
     if not Check_Creds(request.remote_addr,logged_in,"None"):
@@ -979,6 +979,52 @@ def video_feed():
             'address': '/video_feed',
         }
         return render_template('login.html', **template) #Renders webpage
+           
+#Renders a webpage fro pure video streaming which is linked to on main page
+@app.route('/command', methods=['GET', 'POST'])
+def table():
+    global logged_in
+    if not Check_Creds(request.remote_addr,logged_in,"None"):
+        if request.form.get('Login') == 'Login':
+            Username = request.form.get('User')
+            Password = request.form.get('Pass')
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+                creds = list(csv.reader(login))
+            for creds in creds:
+                if creds[0] == Username:
+                    if creds[1] == Password:
+                        logged_in.append([request.remote_addr,creds[2]])
+    if Check_Creds(request.remote_addr,logged_in,"None"):
+        # Reads all the current commands in the buffer and addes N/A if blank
+        Next =[] # list of next 4 commands
+        for i in range(0, 4):
+            try: 
+                Next.append(N_CMD.get(block = False)) # reads queue and adds commands to the list.
+            except: 
+                Next.append("N/A") # N/A if it is not available
+        try: 
+            Current = C_CMD.get(block = False) #Reads current command 
+        except: 
+            Current = "N/A"
+
+        #To edit the webpage HTML file with the python data
+        template = {
+            'Current' : Current,
+            'N1' : Next[0], #the next 4 commands
+            'N2' : Next[1],
+            'N3' : Next[2],
+            'N4' : Next[3]
+        }
+        return render_template('command.html', **template) #Renders webpage         
+    else:
+        template = {
+            'address': '/command',
+        }
+        return render_template('login.html', **template) #Renders webpage
+
+@app.route('/test')
+def test():
+    return render_template('test.html') #Renders webpage
 
 #New control page
 @app.route('/control', methods=['GET', 'POST'])
