@@ -106,14 +106,16 @@ def entry_block(frame, text: str, spin=False, from_ = 0, to = 10, drop_list=None
     elif (type(drop_list) == list):
         entry = ctk.CTkOptionMenu(frame,
                         values=drop_list,
-                        width= 100)
+                        width= 100,
+                        **kwargs)
     else:
         entry = ctk.CTkEntry(frame,
                             width=width,
                             height=25,
                             font=font_XS,
                             border_width=0,
-                            corner_radius=2)
+                            corner_radius=2, 
+                            **kwargs)
 
     return lbl, entry
 
@@ -405,11 +407,112 @@ class MenuBar(tk.Menu):
         menu_help.add_command(label="Parameter",font=('Arial',11), command=lambda: parent.show_frame(P_Param))
         menu_help.add_command(label="Open New Window",font=('Arial',11), command=lambda: parent.OpenNewWindow())
 
+class P_Login(ctk.CTk):
+    def __init__(self, *args, **kwargs):
+        ctk.CTk.__init__(self, *args, **kwargs)
+        ctk.CTk.wm_title(self, "Login")
+
+        title = ctk.CTkLabel(self, text = "Login Page", font=font_L)
+        title.place(relx = 0.5, rely = 0.1, anchor = 'center')
+
+        self.geometry("700x400") 
+        self.minsize(700,400) 
+
+        frame_login = Frame(self)  # this is the frame that holds all the login details and buttons
+        frame_login.place(relx= 0.5, rely = 0.55, relwidth=0.9, relheight=0.8, anchor = 'center')
+
+        lbl_user, entry_user = place_2(0.3, *entry_block(frame_login, text = "Username: ", width=100))
+        lbl_pw, entry_pw = place_2(0.5, *entry_block(frame_login, text = "Password: ", width=100))
+
+        btn_login = btn(frame_login, text="Login", command=lambda: getlogin())
+        btn_register = btn(frame_login, text="Register", command=lambda: go_signup())
+        
+        check_status = ctk.CTkCheckBox(frame_login, text="operator", onvalue="operator", offvalue="viewer")
+        btn_new_account = btn(frame_login, text="Create Account", command=lambda: signup())
+        btn_login_frame = btn(frame_login, text="Already signed up?", command=lambda: login())
+
+        
+        def login():
+            btn_new_account.place_forget()
+            check_status.place_forget()
+            btn_login_frame.place_forget()
+            lbl_user.configure(text='Username: ')
+            lbl_pw.configure(text='Password: ')
+            btn_login.place(rely=0.70, relx=0.50)
+            btn_register.place(rely=0.70, relx=0.75)
+        
+        def go_signup():
+            btn_login.place_forget()
+            btn_register.place_forget()
+            lbl_user.configure(text='New Username: ')
+            lbl_pw.configure(text='New Password: ')
+            btn_login_frame.place(rely=0.70, relx=0.75)
+            btn_new_account.place(relx=0.5, rely=0.9, anchor='center')
+            check_status.place(relx=0.5, rely = 0.7, anchor= 'center')
+            
+        def getlogin():
+            username = entry_user.get()
+            password = entry_pw.get()
+            # if your want to run the script as it is set validation = True
+            validation = validate(username, password)
+            if validation:
+                tk.messagebox.showinfo("Login Successful",
+                                       "Welcome {}".format(username))
+                top.destroy()
+            else:
+                tk.messagebox.showerror("Information", "The Username or Password you have entered are incorrect ")
+
+        def validate(username, password):
+            # Checks the text file for a username/password combination.
+            try:
+                with open(os.path.join(path,"credentials.csv"), "r") as credentials:
+                    users_data = credentials.read().split("\n")
+                    for user_data in users_data:
+                        user_data = user_data.split(",")
+                        if user_data[0] == username and user_data[1] == password:
+                            return True
+                    return False
+            except FileNotFoundError:
+                print("You need to Register first or amend Line 71 to if True:")
+                return False
+        
+        def signup():
+            # Creates a text file with the Username and password
+            user = entry_user.get()
+            pw = entry_pw.get()
+            validation = validate_user(user)
+            if not validation:
+                tk.messagebox.showerror("Information", "That Username already exists")
+            else:
+                if len(pw) > 3:
+                    credentials = open(os.path.join(path,"credentials.csv"), "a")
+                    status = check_status.get()
+                    credentials.write(f"{user},{pw},{status}\n")
+                    credentials.close()
+                    tk.messagebox.showinfo("Information", "Your account details have been stored.")
+                    login()
+                else:
+                    tk.messagebox.showerror("Information", "Your password needs to be longer than 3 values.")
+
+        def validate_user(username):
+            # Checks the csv file for a username/password combination.
+            try:
+                with open(os.path.join(path,"credentials.csv")) as credentials:
+                    for line in credentials:
+                        line = line.split(",")
+                        if line[0] == username:
+                            return False
+                return True
+            except FileNotFoundError:
+                return True
+        
+        login()
+
 class Main(ctk.CTk):
     def __init__(self, *args, **kwargs):
         ctk.CTk.__init__(self, *args, **kwargs)
         ctk.CTk.wm_title(self, "ARCaDIUS")
-        self.geometry("1200x700") 
+        self.geometry("1100x700") 
         self.minsize(700,400) 
         container = ctk.CTkFrame(self, height=700, width=1200)
         container.pack(side="top", fill = "both", expand = "true")
@@ -1101,10 +1204,16 @@ def GUI_Server_Comms():
         command = CMD_rev.recv()
         if command == "PUMP": # if the command is kill
             print("this is a Pump command")
-            Comps.pumps[0].pump(5)
+            try:
+                Comps.pumps[0].pump(5)
+            except:
+                pass
         if command == "Shutter":
             print("This is a shutter command")
-            Comps.shutter.open()
+            try:
+                Comps.shutter.open()
+            except:
+                pass
     elif CMD_rev.poll(timeout=0.1):
         CMD_rev.recv()
     gui.after(200,GUI_Server_Comms) # executes it every 200ms 
@@ -1122,15 +1231,14 @@ def Main_page():
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
-            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'credentials.csv'), newline='') as login:
                 creds = list(csv.reader(login))
             for creds in creds:
                 if creds[0] == Username:
                     if creds[1] == Password:
                         logged_in.append([request.remote_addr,creds[2]])
                                            
-    if any(request.remote_addr in User for User in logged_in):
-        print(1)          
+    if any(request.remote_addr in User for User in logged_in):    
         # Reads all the current commands in the buffer and addes N/A if blank
         Next =[] # list of next 4 commands
         for i in range(0, 4):
@@ -1168,7 +1276,6 @@ def Main_page():
         return render_template('Main.html', **template) #Renders webpage
                             
     else:
-        print(0)
         template = {
             'address': '/',
         }
@@ -1221,13 +1328,13 @@ def control_page():
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
-            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'credentials.csv'), newline='') as login:
                 creds = list(csv.reader(login))
             for creds in creds:
                 if creds[0] == Username:
                     if creds[1] == Password:
                         logged_in.append([request.remote_addr,creds[2]])
-                        
+
     if any(request.remote_addr in User for User in logged_in):
         if request.method == 'POST':
                 if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
@@ -1251,7 +1358,6 @@ def control_page():
             pass
         return render_template('control.html')          
     else:
-        print(0)
         template = {
             'address': '/',
         }
