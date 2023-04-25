@@ -196,7 +196,7 @@ def init_module(label=None):
     ves_in = [0]*3
     ves_out = [0]*6
     ves_main = Vessel(0, "ves_main")
-    with open(os.path.join(path,"hardware.csv"), "r") as hardware:
+    with open(os.path.join(path,"static\hardware.csv"), "r") as hardware:
         modules_data = hardware.read().split("\n")
         for module_data in modules_data:
             module_data = module_data.split(",")
@@ -348,7 +348,7 @@ class P_Login(ctk.CTk):
         def validate(username, password):
             # Checks the text file for a username/password combination.
             try:
-                with open(os.path.join(path,"credentials.csv"), "r") as credentials:
+                with open(os.path.join(path,"\\static", "credentials.csv"), "r") as credentials:
                     users_data = credentials.read().split("\n")
                     for user_data in users_data:
                         user_data = user_data.split(",")
@@ -368,7 +368,7 @@ class P_Login(ctk.CTk):
                 tk.messagebox.showerror("Information", "That Username already exists")
             else:
                 if len(pw) > 3:
-                    credentials = open(os.path.join(path,"credentials.csv"), "a")
+                    credentials = open(os.path.join(path,"\\static","credentials.csv"), "a")
                     status = check_status.get()
                     credentials.write(f"{user},{pw},{status}\n")
                     credentials.close()
@@ -380,7 +380,7 @@ class P_Login(ctk.CTk):
         def validate_user(username):
             # Checks the csv file for a username/password combination.
             try:
-                with open(os.path.join(path,"credentials.csv")) as credentials:
+                with open(os.path.join(path,"\\static","credentials.csv")) as credentials:
                     for line in credentials:
                         line = line.split(",")
                         if line[0] == username:
@@ -861,7 +861,7 @@ class Scratch():
         elif selected=="Output":  current_widgets = self.Out_widgets
         elif selected=="Mix":     current_widgets = self.mix_widgets
         elif selected=="Shutter": current_widgets = self.shutter_widgets
-        elif selected=="Extract": current_widgets = self.Ext_widgets
+        elif selected=="Extract": current_widgets = self.Out_widgets
         elif selected=="System":  current_widgets = self.system_widgets
         
         self.current_widgets = current_widgets
@@ -869,6 +869,7 @@ class Scratch():
 
     def send_command(self):
         selected = self.combo.get()
+        print(selected)
         if selected=="Input":     
             num = int(self.In_widgets[1].get())
             vol = float(self.In_widgets[3].get())
@@ -920,7 +921,7 @@ class P_Code(ctk.CTkFrame):
         def start_experiment():
             for scratch_row in scratch_rows:
                 scratch_row.send_command()
-            Pbar.SET(buffer.Length())
+            Pbar.SET(buffer.Left())
         def delete_row():
             scratch_rows.pop(-1).delete()
 
