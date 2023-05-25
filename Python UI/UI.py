@@ -13,6 +13,7 @@ log.setLevel(logging.ERROR)
 
 #pyinstaller --onedir -w --add-data "c:\users\idan\appdata\local\programs\python\python310\lib\site-packages\customtkinter;customtkinter\" UI.py
 # UI styles 
+
 font_XS = ("Consolas", 15, "normal")
 font_S = ("Consolas", 18, "normal")
 font_M = ("Consolas", 25, "normal")
@@ -22,7 +23,7 @@ def set_mode(i: int):
     if i==1: ctk.set_appearance_mode("dark")
 set_mode(1)
 ctk.set_default_color_theme("dark-blue")
-
+path = os.path.dirname(os.path.realpath(__file__))
 class ProgressBar():
     def __init__(self, master, buffer):
         self.Pbar = ctk.CTkProgressBar(master, width= 300, height=25, corner_radius=5)
@@ -34,7 +35,7 @@ class ProgressBar():
         self.n_tasks = n_tasks
     
     def refresh(self):
-        ratio = (self.n_tasks-self.buffer.Left())/self.n_tasks
+        ratio = (self.n_tasks-self.buffer.Length())/self.n_tasks
         self.Pbar.set(ratio)
         if ratio==1:
             self.Pbar.place_forget()
@@ -96,7 +97,7 @@ def btn_img(frame, text: str,  file_name: str, command=None, Xresize = 30, Yresi
     btn.image = photo
     return btn
 
-def entry_block(frame, text: str, spin=False, from_ = 0, to = 10, drop_list=None, wrap=True, **kwargs):
+def entry_block(frame, text: str, spin=False, from_ = 0, to = 10, drop_list=None, wrap=True, width=50, **kwargs):
     """label followed by entry widget"""
     lbl = ctk.CTkLabel(frame, font=font_XS, text = text)
     if (spin):
@@ -105,14 +106,16 @@ def entry_block(frame, text: str, spin=False, from_ = 0, to = 10, drop_list=None
     elif (type(drop_list) == list):
         entry = ctk.CTkOptionMenu(frame,
                         values=drop_list,
-                        width= 100)
+                        width= 100,
+                        **kwargs)
     else:
         entry = ctk.CTkEntry(frame,
-                            width=50,
+                            width=width,
                             height=25,
                             font=font_XS,
                             border_width=0,
-                            corner_radius=2)
+                            corner_radius=2, 
+                            **kwargs)
 
     return lbl, entry
 
@@ -120,6 +123,17 @@ def place_2(rely, lbl, entry, relx = 0.5):
     lbl.place(relx = relx-0.05, rely = rely, anchor = 'e')
     entry.place(relx = relx, rely = rely, anchor = 'w')
     return lbl, entry
+
+def place_n(widgets,rely, boundary=(0,1)):
+    #equally distributed widgets across frame 
+    L_bound, R_bound = boundary
+    segment = R_bound-L_bound
+    n = len(widgets)
+    for i in range(len(widgets)):
+        point = segment*(i+1)/(n+1)+L_bound
+        try:
+            widgets[i].place(relx = point, rely=rely, anchor='center')
+        except:pass
 
 def popup(text):
     popup = tk.Tk()
@@ -166,6 +180,7 @@ def check_isnumber(value, type = 'float'):
 com.delete_file()
 phone = com.notif()
 buffer = com.Buffer()
+radiate = com.Cabin()
 Comps = com.Components()
 def init_module(label=None):
     global arduinos, device
@@ -181,7 +196,11 @@ def init_module(label=None):
     ves_in = [0]*3
     ves_out = [0]*6
     ves_main = Vessel(0, "ves_main")
-
+    with open(os.path.join(path,"static\hardware.csv"), "r") as hardware:
+        modules_data = hardware.read().split("\n")
+        for module_data in modules_data:
+            module_data = module_data.split(",")
+            print(module_data)
     for i in range(len(Ports)):
         print("\nSource: ", Ports[i])
         device = com.OPEN_SERIAL_PORT(Ports[i])
@@ -201,8 +220,6 @@ def init_module(label=None):
             ves_in[0] = Vessel()
             pumps[0] = Pump(device, deviceID, 1, buffer)
             pumps[1] = Pump(device, deviceID, 2, buffer)
-            shutter = Shutter(device, deviceID, 1, buffer)
-            mixer = Mixer(device, deviceID, 1, buffer)
         if deviceID=="1002":
             arduinos[1] = Nano(device, deviceID, Ports[i])
             arduinos[1].add_component("Input Module 2, pump 2")
@@ -248,6 +265,7 @@ def init_module(label=None):
     Comps.mixer = mixer
     Comps.shutter = shutter
     Comps.extract = extract
+    Comps.radiate = radiate
     Comps.Temp = [-1]
     Comps.Bubble = [-1]*3
     Comps.LDS = [-1]*4
@@ -263,13 +281,115 @@ def init_module(label=None):
     except:pass
     print("\n------------ End initialisation --------------\n\n")
 
-
 # UI classes
 class Frame(ctk.CTkFrame):
     def __init__(self, master, text="", **kwargs):
         super().__init__(master, **kwargs)
         self.label = ctk.CTkLabel(self, text=text)
         self.label.grid(row=0, column=0, padx=20)
+
+class P_Login(ctk.CTk):
+    def __init__(self, *args, **kwargs):
+        ctk.CTk.__init__(self, *args, **kwargs)
+        ctk.CTk.wm_title(self, "Login")
+
+        title = ctk.CTkLabel(self, text = "Login Page", font=font_L)
+        title.place(relx = 0.5, rely = 0.1, anchor = 'center')
+
+        self.geometry("700x400") 
+        self.minsize(700,400) 
+
+        frame_login = Frame(self)  # this is the frame that holds all the login details and buttons
+        frame_login.place(relx= 0.5, rely = 0.55, relwidth=0.9, relheight=0.8, anchor = 'center')
+
+        lbl_user, entry_user = place_2(0.3, *entry_block(frame_login, text = "Username: ", width=100))
+        lbl_pw, entry_pw = place_2(0.5, *entry_block(frame_login, text = "Password: ", width=100))
+        entry_user.insert(0, 'Arcadius')
+        entry_pw.insert(0, 'Arcadius')
+
+        btn_login = btn(frame_login, text="Login", command=lambda: getlogin())
+        btn_register = btn(frame_login, text="Register", command=lambda: go_signup())
+        
+        check_status = ctk.CTkCheckBox(frame_login, text="operator", onvalue="operator", offvalue="viewer")
+        btn_new_account = btn(frame_login, text="Create Account", command=lambda: signup())
+        btn_login_frame = btn(frame_login, text="Already signed up?", command=lambda: login())
+
+        
+        def login():
+            btn_new_account.place_forget()
+            check_status.place_forget()
+            btn_login_frame.place_forget()
+            lbl_user.configure(text='Username: ')
+            lbl_pw.configure(text='Password: ')
+            btn_login.place(rely=0.70, relx=0.50)
+            btn_register.place(rely=0.70, relx=0.75)
+        
+        def go_signup():
+            btn_login.place_forget()
+            btn_register.place_forget()
+            lbl_user.configure(text='New Username: ')
+            lbl_pw.configure(text='New Password: ')
+            btn_login_frame.place(rely=0.70, relx=0.75)
+            btn_new_account.place(relx=0.5, rely=0.9, anchor='center')
+            check_status.place(relx=0.5, rely = 0.7, anchor= 'center')
+            
+        def getlogin():
+            username = entry_user.get()
+            password = entry_pw.get()
+            # if your want to run the script as it is set validation = True
+            validation = validate(username, password)
+            if validation:
+                tk.messagebox.showinfo("Login Successful",
+                                       "Welcome {}".format(username))
+                top.destroy()
+            else:
+                tk.messagebox.showerror("Information", "The Username or Password you have entered are incorrect ")
+
+        def validate(username, password):
+            # Checks the text file for a username/password combination.
+            try:
+                with open(os.path.join(path,"\\static", "credentials.csv"), "r") as credentials:
+                    users_data = credentials.read().split("\n")
+                    for user_data in users_data:
+                        user_data = user_data.split(",")
+                        if user_data[0] == username and user_data[1] == password:
+                            return True
+                    return False
+            except FileNotFoundError:
+                print("You need to Register first")
+                return False
+        
+        def signup():
+            # Creates a text file with the Username and password
+            user = entry_user.get()
+            pw = entry_pw.get()
+            validation = validate_user(user)
+            if not validation:
+                tk.messagebox.showerror("Information", "That Username already exists")
+            else:
+                if len(pw) > 3:
+                    credentials = open(os.path.join(path,"\\static","credentials.csv"), "a")
+                    status = check_status.get()
+                    credentials.write(f"{user},{pw},{status}\n")
+                    credentials.close()
+                    tk.messagebox.showinfo("Information", "Your account details have been stored.")
+                    login()
+                else:
+                    tk.messagebox.showerror("Information", "Your password needs to be longer than 3 values.")
+
+        def validate_user(username):
+            # Checks the csv file for a username/password combination.
+            try:
+                with open(os.path.join(path,"\\static","credentials.csv")) as credentials:
+                    for line in credentials:
+                        line = line.split(",")
+                        if line[0] == username:
+                            return False
+                return True
+            except FileNotFoundError:
+                return True
+        
+        login()
 
 class MenuBar(tk.Menu):
     def __init__(self, parent):
@@ -278,26 +398,121 @@ class MenuBar(tk.Menu):
         self.configure(background= 'blue', fg='red')
 
         self.add_command(label="Home", command=lambda: parent.show_frame(P_Home))
-
-        self.add_command(label="Manual", command=lambda: parent.show_frame(P_Test))
-
-        menu_auto = tk.Menu(self, tearoff=0)
-        self.add_cascade(label="Auto", menu=menu_auto)
-        menu_auto.add_command(label="MVP",font=('Arial',11), command=lambda: parent.show_frame(P_Auto))
-        menu_auto.add_separator()
-        menu_auto.add_command(label="iterate",font=('Arial',11), command=lambda: parent.show_frame(P_Iter))
+        self.add_command(label="Control", command=lambda: parent.show_frame(P_Auto))
+        self.add_command(label="Iterative", command=lambda: parent.show_frame(P_Iter))
+        self.add_command(label="LEGO", command=lambda: parent.show_frame(P_Code))
 
         menu_help = tk.Menu(self, tearoff=0)
         self.add_cascade(label="More", menu=menu_help)
         menu_help.add_command(label="Parameter",font=('Arial',11), command=lambda: parent.show_frame(P_Param))
         menu_help.add_command(label="Open New Window",font=('Arial',11), command=lambda: parent.OpenNewWindow())
-        menu_help.add_command(label="Camera",font=('Arial',11), command=lambda: parent.show_frame(P_Cam))
+
+class P_Login(ctk.CTk):
+    def __init__(self, *args, **kwargs):
+        ctk.CTk.__init__(self, *args, **kwargs)
+        ctk.CTk.wm_title(self, "Login")
+
+        title = ctk.CTkLabel(self, text = "Login Page", font=font_L)
+        title.place(relx = 0.5, rely = 0.1, anchor = 'center')
+
+        self.geometry("700x400") 
+        self.minsize(700,400) 
+
+        frame_login = Frame(self)  # this is the frame that holds all the login details and buttons
+        frame_login.place(relx= 0.5, rely = 0.55, relwidth=0.9, relheight=0.8, anchor = 'center')
+
+        lbl_user, entry_user = place_2(0.3, *entry_block(frame_login, text = "Username: ", width=100))
+        lbl_pw, entry_pw = place_2(0.5, *entry_block(frame_login, text = "Password: ", width=100))
+
+        btn_login = btn(frame_login, text="Login", command=lambda: getlogin())
+        btn_register = btn(frame_login, text="Register", command=lambda: go_signup())
+        
+        check_status = ctk.CTkCheckBox(frame_login, text="operator", onvalue="operator", offvalue="viewer")
+        btn_new_account = btn(frame_login, text="Create Account", command=lambda: signup())
+        btn_login_frame = btn(frame_login, text="Already signed up?", command=lambda: login())
+
+        
+        def login():
+            btn_new_account.place_forget()
+            check_status.place_forget()
+            btn_login_frame.place_forget()
+            lbl_user.configure(text='Username: ')
+            lbl_pw.configure(text='Password: ')
+            btn_login.place(rely=0.70, relx=0.50)
+            btn_register.place(rely=0.70, relx=0.75)
+        
+        def go_signup():
+            btn_login.place_forget()
+            btn_register.place_forget()
+            lbl_user.configure(text='New Username: ')
+            lbl_pw.configure(text='New Password: ')
+            btn_login_frame.place(rely=0.70, relx=0.75)
+            btn_new_account.place(relx=0.5, rely=0.9, anchor='center')
+            check_status.place(relx=0.5, rely = 0.7, anchor= 'center')
+            
+        def getlogin():
+            username = entry_user.get()
+            password = entry_pw.get()
+            # if your want to run the script as it is set validation = True
+            validation = validate(username, password)
+            if validation:
+                tk.messagebox.showinfo("Login Successful",
+                                       "Welcome {}".format(username))
+                top.destroy()
+            else:
+                tk.messagebox.showerror("Information", "The Username or Password you have entered are incorrect ")
+
+        def validate(username, password):
+            # Checks the text file for a username/password combination.
+            try:
+                with open(os.path.join(path,"credentials.csv"), "r") as credentials:
+                    users_data = credentials.read().split("\n")
+                    for user_data in users_data:
+                        user_data = user_data.split(",")
+                        if user_data[0] == username and user_data[1] == password:
+                            return True
+                    return False
+            except FileNotFoundError:
+                print("You need to Register first or amend Line 71 to if True:")
+                return False
+        
+        def signup():
+            # Creates a text file with the Username and password
+            user = entry_user.get()
+            pw = entry_pw.get()
+            validation = validate_user(user)
+            if not validation:
+                tk.messagebox.showerror("Information", "That Username already exists")
+            else:
+                if len(pw) > 3:
+                    credentials = open(os.path.join(path,"credentials.csv"), "a")
+                    status = check_status.get()
+                    credentials.write(f"{user},{pw},{status}\n")
+                    credentials.close()
+                    tk.messagebox.showinfo("Information", "Your account details have been stored.")
+                    login()
+                else:
+                    tk.messagebox.showerror("Information", "Your password needs to be longer than 3 values.")
+
+        def validate_user(username):
+            # Checks the csv file for a username/password combination.
+            try:
+                with open(os.path.join(path,"credentials.csv")) as credentials:
+                    for line in credentials:
+                        line = line.split(",")
+                        if line[0] == username:
+                            return False
+                return True
+            except FileNotFoundError:
+                return True
+        
+        login()
 
 class Main(ctk.CTk):
     def __init__(self, *args, **kwargs):
         ctk.CTk.__init__(self, *args, **kwargs)
         ctk.CTk.wm_title(self, "ARCaDIUS")
-        self.geometry("1200x700") 
+        self.geometry("1100x700") 
         self.minsize(700,400) 
         container = ctk.CTkFrame(self, height=700, width=1200)
         container.pack(side="top", fill = "both", expand = "true")
@@ -306,7 +521,7 @@ class Main(ctk.CTk):
 
         self.frames = {}
 
-        for F in (P_Init, P_Home, P_Test, P_Auto, P_Iter, P_Hist, P_Param, P_Cam):
+        for F in (P_Init, P_Home, P_Test, P_Auto, P_Code, P_Iter, P_Hist, P_Param):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -382,31 +597,20 @@ class P_Init(ctk.CTkFrame):
 class P_Home(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self, parent)
-        add_image(self, "arcadius.png", relx=0.5, rely=0.05, size=(200,40), anchor = 'n')
+        add_image(self, "arcadius.png", relx=0.5, rely=0.05, size=(300,60), anchor = 'n')
 
-        frame1 = Frame(self, fg_color="transparent")
-        frame1.place(relx= 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
+        btn1=btn_img(self, "Automate", "auto.png", command=lambda: controller.show_frame(P_Auto))
+        btn2=btn_img(self, "Iterate", "iter.png", command=lambda: controller.show_frame(P_Iter))
+        btn3=btn_img(self, "LEGO", "code.png", command=lambda: controller.show_frame(P_Code))
+        place_n([btn1, btn2, btn3], 0.4, (0.2, 0.8))
 
-        btn1=btn_img(frame1, "Manual", "manual.png", command=lambda: controller.show_frame(P_Test))
-        btn1.place(relx = 0.45, rely = 0.2, anchor = 'e')
-        
-        btn2=btn_img(frame1, "Automate", "auto.png", command=lambda: controller.show_frame(P_Auto))
-        btn2.place(relx = 0.55, rely = 0.2,  anchor = 'w')
+        btn1=btn_img(self, "Manual", "manual.png", command=lambda: controller.show_frame(P_Test))
+        btn2=btn_img(self, "Task", "book.png", command=lambda: controller.show_frame(P_Hist))
+        btn3=btn_img(self, "Parameters", "param.png", command=lambda: controller.show_frame(P_Param))
+        place_n([btn1, btn2, btn3], 0.6, (0.2,0.8))
 
-        btn3=btn_img(frame1, "Task", "book.png", command=lambda: controller.show_frame(P_Hist))
-        btn3.place(relx = 0.45, rely = 0.4, anchor = 'e')
-
-        btn4=btn_img(frame1, "Iterate", "iter.png", command=lambda: controller.show_frame(P_Iter))
-        btn4.place(relx = 0.55, rely = 0.4, anchor = 'w')
-
-        btn5=btn_img(frame1, "Parameters", "param.png", command=lambda: controller.show_frame(P_Param))
-        btn5.place(relx = 0.45, rely = 0.6, anchor = 'e')
-
-        btn4=btn_img(frame1, "Camera", "cam.png", command=lambda: controller.show_frame(P_Cam))
-        btn4.place(relx = 0.55, rely = 0.6, anchor = 'w')
-
-        btn6 = btn(frame1, text="Exit", command=lambda: controller.Quit_application())
-        btn6.place(relx = 0.5, rely = 0.9, anchor = 'center')
+        btn_exit = btn(self, text="Exit", command=lambda: controller.Quit_application())
+        btn_exit.place(relx = 0.5, rely = 0.8, anchor = 'center')
 
 class P_Param(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -418,19 +622,46 @@ class P_Param(ctk.CTkFrame):
         tabs.place(relx = 0.5, rely = 0.55, relwidth=0.8, relheight=0.8, anchor = 'center')
 
         frame_vessel = Frame(tabs.tab("Module"), text="Vessel levels")
-        frame_vessel.place(relx= 0.7, rely = 0.5, relwidth=0.3, relheight=0.4, anchor = 'center')
+        frame_vessel.place(relx= 0.7, rely = 0.25, relwidth=0.3, relheight=0.4, anchor = 'center')
 
         frame_nano = Frame(tabs.tab("Module"), text="Arduinos")
-        frame_nano.place(relx= 0.3, rely = 0.5, relwidth=0.3, relheight=0.4, anchor = 'center')
+        frame_nano.place(relx= 0.3, rely = 0.25, relwidth=0.3, relheight=0.4, anchor = 'center')
+
+        frame_cabinet = Frame(tabs.tab("Module"), text="Cabinet")
+        frame_cabinet.place(relx= 0.3, rely = 0.75, relwidth=0.3, relheight=0.3, anchor = 'center')
         
         frame_push = Frame(tabs.tab("Interface"), text="Push notification")
         frame_push.place(relx= 0.5, rely = 0.5, relwidth=0.4, relheight=0.3, anchor = 'center')
+
         #arduino
-        
         details = ctk.CTkLabel(frame_nano, font=font_XS, text='\n'.join(Comps.modules),justify= 'left')
         details.place(relx = 0.5, rely = 0.5, anchor = 'center') 
         btn_flush = btn(frame_nano, text = 'reset', command=lambda: init_module(details))
         btn_flush.place(relx=0.5, rely=0.1, anchor='center')
+
+        # cabinet
+        _, ent_height = place_2(0.5, *entry_block(frame_cabinet,'Cabinet height:'), 0.7)
+        ent_height.insert(0, str(Comps.radiate.cabin_height))
+        btn_save = btn(frame_cabinet, text ='save', command=lambda: Comps.radiate.set_cabin_height(float(ent_height.get())))
+        btn_save.place(relx = 0.5, rely = 0.8, anchor = 'center')
+
+        # vessels
+        n = 3
+        ent_Rname = [0]*n
+        ent_Rvol = [0]*n
+        names, volumes =  com.read_detail('details.csv')
+        for i in range(n):
+            if i==0: text = 'A'
+            elif i==1: text = 'B'
+            elif i==2: text = 'C'
+            _, ent_Rname[i] = place_2(0.2 + 0.2*i, *entry_block(frame_vessel, text=text), relx = 0.25)
+            _, ent_Rvol[i]  = place_2(0.2 + 0.2*i, *entry_block(frame_vessel, text=(' Vol: ')), relx = 0.75)
+           
+            ent_Rname[i].insert(0,names[i])
+            ent_Rvol[i].insert(0,volumes[i])
+
+        btn1 = btn(frame_vessel, text ='save', command=lambda: com.vessel_detail(ent_Rname, ent_Rvol))
+        btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
 
         # interface
         mode_switch = ctk.CTkSwitch(master=tabs.tab("Interface"), text="Dark Mode", command=lambda: set_mode(mode_switch.get()), onvalue=1, offvalue=0)
@@ -450,24 +681,6 @@ class P_Param(ctk.CTkFrame):
         ent_user.configure(width=200)
         ent_app.insert(0, phone.app_token)
         ent_user.insert(0, phone.user_key)
-
-        # vessels
-        n = 3
-        ent_Rname = [0]*n
-        ent_Rvol = [0]*n
-        names, volumes =  com.read_detail('details.csv')
-        for i in range(n):
-            if i==0: text = 'A'
-            elif i==1: text = 'B'
-            elif i==2: text = 'C'
-            _, ent_Rname[i] = place_2(0.2 + 0.2*i, *entry_block(frame_vessel, text=text), relx = 0.25)
-            _, ent_Rvol[i]  = place_2(0.2 + 0.2*i, *entry_block(frame_vessel, text=(' Vol: ')), relx = 0.75)
-           
-            ent_Rname[i].insert(0,names[i])
-            ent_Rvol[i].insert(0,volumes[i])
-
-        btn1 = btn(frame_vessel, text ='save', command=lambda: com.vessel_detail(ent_Rname, ent_Rvol))
-        btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
 
 class P_Test(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -493,21 +706,15 @@ class P_Test(ctk.CTkFrame):
         _, ent_valve = place_2(0.2, *entry_block(frame1, "select valve: ", spin=True, from_=1, to=len(Comps.valves)))
 
         btn1 = btn(frame1, text="close", command=lambda: Comps.valves[int(ent_valve.get())-1].close())
-        btn1.place(relx = 0.48, rely = 0.3, anchor = 'e')
         btn2 = btn(frame1, text="open", command=lambda: Comps.valves[int(ent_valve.get())-1].open())
-        btn2.place(relx = 0.52, rely = 0.3, anchor = 'w')
         btn3 = btn(frame1, text="mid", command=lambda: Comps.valves[int(ent_valve.get())-1].mid())
-        btn3.place(relx = 0.5, rely = 0.4, anchor = 'center')
-
+        place_n([btn1, btn2, btn3], rely=0.3)
         #box 1.2 Shutter
         
         btn1 = btn(frame12, text="close", command=lambda: Comps.shutter.close())
-        btn1.place(relx = 0.48, rely = 0.3, anchor = 'e')
         btn2 = btn(frame12, text="open", command=lambda: Comps.shutter.open())
-        btn2.place(relx = 0.52, rely = 0.3, anchor = 'w')
         btn3 = btn(frame12, text="mid", command=lambda: Comps.shutter.mid())
-        btn3.place(relx = 0.5, rely = 0.5, anchor = 'center')
-
+        place_n([btn1, btn2, btn3], rely=0.3)
 
         #box 2 pump
         _, ent_pump = place_2(0.2,*entry_block(frame2, "select pump: ", spin=True, from_=1, to=len(Comps.pumps)))
@@ -525,8 +732,6 @@ class P_Test(ctk.CTkFrame):
         _, ent_ext = place_2(0.2,*entry_block(frame4, "select slot: ", spin=True, from_=1, to=5))
         ent_ext.config(command=lambda: Comps.extract.set_slot(int(ent_ext.get())))
         
-
-
 class P_Auto(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)
@@ -542,7 +747,7 @@ class P_Auto(ctk.CTkFrame):
         _, ent_P[0] = place_2(0.2, *entry_block(frame1, text="Input A (ml)"))
         _, ent_P[1] = place_2(0.3, *entry_block(frame1, text="Input B (ml)"))
         _, ent_P[2] = place_2(0.4, *entry_block(frame1, text="Input C (ml)"))
-        _, ent_I = place_2(0.5, *entry_block(frame1, text="shutter time (s)"))
+        _, ent_I = place_2(0.5, *entry_block(frame1, text="Total dosage (Gy)"))
         
         out_list = ["Input A", "Input B", "Product", "Waste", "Recycle", "Recycle 2"]
         _, sel_output = place_2(0.6, *entry_block(frame1, text="Select Output", drop_list=out_list))
@@ -561,10 +766,13 @@ class P_Auto(ctk.CTkFrame):
                     tot_vol+=vol
                     Comps.pumps[i].pump(vol)
                 except:pass
+            try:Comps.shutter.open()
+            except:pass
             try:
-                Comps.shutter.open()
-                Comps.buffer.BLOCK(float(ent_I.get()))
-                Comps.shutter.close()
+                time = Comps.radiate.D2T(float(ent_I.get()))
+                Comps.buffer.BLOCK(time)
+            except:pass
+            try:Comps.shutter.close()
             except:pass
 
             try:
@@ -572,7 +780,7 @@ class P_Auto(ctk.CTkFrame):
                 Comps.pumps[3].pump(tot_vol+10)
             except:pass
             buffer.NOTIFY('Experiment Over')
-            Pbar.SET(buffer.Left())
+            Pbar.SET(buffer.Length())
        
         # buffer list
         textbox = ctk.CTkTextbox(frame2,width=300, height=200, state= 'normal')
@@ -593,6 +801,155 @@ class P_Auto(ctk.CTkFrame):
         def update_cam():
             try:
                 if (controller.visible_frame==P_Auto):
+                    controller.get_cam_frame(label, resize = 0.6)
+            except:
+                pass
+            label.after(50, update_cam)
+        update_cam()
+
+class Scratch():
+    def __init__(self, frame, rely):
+        self.rely = rely
+        
+        module_list = ["Input", "Output", "Mix", "Shutter", "Extract", "System"]
+        _, combo = place_2(rely,*entry_block(frame, text="", drop_list=module_list),0.1)
+        combo.configure(command=self.combo_select)
+        self.combo=combo
+
+        In_widgets = [0]*4
+        Out_widgets = [0]*4
+        mix_widgets = [0]*4
+        shutter_widgets = [0]*4
+        Ext_widgets = [0]*4
+        system_widgets = [0]*4
+
+        In_widgets[0], In_widgets[1] = entry_block(frame, "select pump: ", spin=True, from_=1, to=3)
+        In_widgets[2], In_widgets[3] = entry_block(frame, "Volume (ml)")
+        
+        self.out_list = ["Out 1", "Out 2", "Out 3", "Out 4", "Out 5", "Out 6"]
+        Out_widgets[0], Out_widgets[1] = entry_block(frame, text="Select Output", drop_list=self.out_list)
+        Out_widgets[2], Out_widgets[3] = entry_block(frame, "Volume (ml)")
+        
+        mix_widgets[0], mix_widgets[1] = entry_block(frame, text="Speed")
+        
+        shutter_list = ["Open", "close", "mid"]
+        shutter_widgets[0], shutter_widgets[1] = entry_block(frame, text="mode", drop_list=shutter_list)
+        
+        Ext_widgets[0], Ext_widgets[1] = entry_block(frame, "select slot: ", spin=True, from_=1, to=5)
+        Ext_widgets[2], Ext_widgets[3] = entry_block(frame, "Volume (ml)")
+        
+        system_widgets[0], system_widgets[1] = entry_block(frame, text="Block time (s)")
+
+        self.In_widgets = In_widgets
+        self.Out_widgets = Out_widgets
+        self.mix_widgets = mix_widgets
+        self.shutter_widgets = shutter_widgets
+        self.Ext_widgets = Ext_widgets
+        self.system_widgets = system_widgets
+        self.all_widgets = In_widgets+Out_widgets+mix_widgets+shutter_widgets+system_widgets
+        self.combo_select(combo.get())
+
+        self.current_widgets=self.In_widgets
+    
+    def combo_select(self, selected):
+        for w in self.all_widgets:
+            try: 
+                w.place_forget()
+            except AttributeError: 
+                pass
+        if selected=="Input":     current_widgets = self.In_widgets
+        elif selected=="Output":  current_widgets = self.Out_widgets
+        elif selected=="Mix":     current_widgets = self.mix_widgets
+        elif selected=="Shutter": current_widgets = self.shutter_widgets
+        elif selected=="Extract": current_widgets = self.Out_widgets
+        elif selected=="System":  current_widgets = self.system_widgets
+        
+        self.current_widgets = current_widgets
+        place_n(self.current_widgets, rely=self.rely, boundary=(0.2,1))
+
+    def send_command(self):
+        selected = self.combo.get()
+        print(selected)
+        if selected=="Input":     
+            num = int(self.In_widgets[1].get())
+            vol = float(self.In_widgets[3].get())
+            Comps.pumps[num].pump(vol)
+        elif selected=="Output":  
+            state = self.out_list.index(self.Out_widgets[1].get())
+            vol = float(self.Out_widgets[3].get())
+            com.valve_states(Comps.valves, state)
+            Comps.pumps[3].pump(vol)
+        elif selected=="Mix":     
+            Comps.mixer.mix(int(self.mix_widgets[1].get()))
+        elif selected=="Shutter": 
+            state = self.out_list.index(self.shutter_widgets[1].get())
+            Comps.shutter.set_to(state)
+        elif selected=="Extract": 
+            state = int(self.Ext_widgets[1].get())
+            vol = float(self.Ext_widgets[3].get())
+            Comps.extract.set_slot(state)
+            Comps.pumps[4].pump(vol)
+        elif selected=="System":  
+            time = float(self.system_widgets[1].get())
+            Comps.buffer.BLOCK(time)
+    
+    def delete(self):
+        self.combo.place_forget()
+        for w in self.all_widgets:
+            try: 
+                w.place_forget()
+            except AttributeError:
+                pass
+        del self
+
+class P_Code(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        ctk.CTkFrame.__init__(self,parent)
+        title = ctk.CTkLabel(self, text = "Modular", font=font_L)
+        title.place(relx = 0.5, rely = 0.1, anchor = 'center')
+
+        frame1 = Frame(self)
+        frame1.place(relx= 0.6, rely = 0.55, relwidth=0.55, relheight=0.8, anchor = 'e')
+        frame2 = Frame(self, fg_color = 'transparent')
+        frame2.place(relx= 0.6, rely = 0.55, relwidth=0.4, relheight=0.8, anchor = 'w')
+        scratch_rows = [Scratch(frame1, 1/15)]
+        Pbar = ProgressBar(frame2, buffer)
+
+        def new_row():
+            rely = (len(scratch_rows)+1)/15
+            scratch_rows.append(Scratch(frame1, rely))
+        def start_experiment():
+            for scratch_row in scratch_rows:
+                scratch_row.send_command()
+            Pbar.SET(buffer.Left())
+        def delete_row():
+            scratch_rows.pop(-1).delete()
+
+        btn_minus = btn_img(frame1, text="remove step", file_name='minus.png', command=lambda: delete_row())    
+        btn_start = btn(frame1, text="Start", width = 100, height=35, command=lambda: start_experiment(), font=font_S)
+        btn_plus = btn_img(frame1, text="add step", file_name='plus.png', command=lambda: new_row())
+        
+        place_n([btn_minus, btn_start, btn_plus], 0.9)
+        # buffer list
+
+        textbox = ctk.CTkTextbox(frame2,width=300, height=200, state= 'normal')
+        textbox.place(relx=0.5, rely=0, anchor="n")
+        def update_buffer():
+            try:
+                if (controller.visible_frame==P_Code):
+                    controller.update_buffer_list(textbox)
+                    Pbar.refresh()
+            except:
+                pass
+            textbox.after(500, update_buffer)
+        update_buffer()
+
+        #camera
+        label = ctk.CTkLabel(frame2, text="")
+        label.place(relx = 0.5, rely = 1, anchor = 's')
+        def update_cam():
+            try:
+                if (controller.visible_frame==P_Code):
                     controller.get_cam_frame(label, resize = 0.6)
             except:
                 pass
@@ -620,7 +977,7 @@ class P_Iter(ctk.CTkFrame):
         _, ent_volC = place_2(0.4, *entry_block(frame1, "C (ml):"), 0.4)
         _, ent_stepC = place_2(0.4, *entry_block(frame1, " + it x", spin=True, from_=-20, wrap=False, increment = 0.1), 0.7)
         ent_stepC.set(0)
-        _, ent_Shut= place_2(0.5, *entry_block(frame1, "shutter time:"), 0.4)
+        _, ent_Shut= place_2(0.5, *entry_block(frame1, "Dosage (Gy):"), 0.4)
         _, ent_step_Shut = place_2(0.5, *entry_block(frame1, " + it x", spin=True, wrap=False, from_=0), 0.7)
 
         _, ent_count = place_2(0.6, *entry_block(frame1, "number of iterations:", spin=True, from_=1, to=10))
@@ -663,8 +1020,8 @@ class P_Iter(ctk.CTkFrame):
             Rb_step = ent_stepB.get()
             Rc = ent_volC.get()
             Rc_step = ent_stepC.get()
-            time = ent_Shut.get()
-            time_step = ent_step_Shut.get()
+            dosage = ent_Shut.get()
+            dosage_step = ent_step_Shut.get()
             count = int(ent_count.get())
 
             for i in range(count):
@@ -674,10 +1031,11 @@ class P_Iter(ctk.CTkFrame):
                     Comps.pumps[1].pump(float(Rb) + float(Rb_step)*i)
                 if Rc!="" and Rc_step!="":
                     Comps.pumps[2].pump(float(Rc) + float(Rc_step)*i)
-                if time!="" and time_step!="":
+                if dosage!="" and dosage_step!="":
                     try:
                         Comps.shutter.open()
-                        Comps.buffer.BLOCK(float(time)+float(time_step)*i)
+                        time = Comps.radiate.D2T(float(dosage)+float(dosage_step)*i)
+                        Comps.buffer.BLOCK(time)
                         Comps.shutter.close()
                     except:pass
                 try:
@@ -685,7 +1043,7 @@ class P_Iter(ctk.CTkFrame):
                     Comps.pumps[3].pump(10)
                 except:pass
 
-            Pbar.SET(buffer.Left())
+            Pbar.SET(buffer.Length())
             buffer.NOTIFY('Iterations Over')
       
 class P_Hist(ctk.CTkFrame):
@@ -740,23 +1098,6 @@ class P_Hist(ctk.CTkFrame):
             textbox.after(500, update_page)
         update_page()
 
-class P_Cam(ctk.CTkFrame):
-    def __init__(self, parent, controller):
-        ctk.CTkFrame.__init__(self,parent)
-        
-        label = ctk.CTkLabel(self, text="")
-        label.place(relx = 0.5, rely = 0.5, anchor = 'center')
-    
-
-        def update_cam():
-            try: 
-                if (controller.visible_frame==P_Cam):
-                    controller.get_cam_frame(label)
-            except:
-                pass
-            label.after(50, update_cam)
-        update_cam()
- 
 class OpenNewWindow(tk.Tk):
     def __init__(self, *args, **kwargs):
 
@@ -779,20 +1120,24 @@ class OpenNewWindow(tk.Tk):
 
 def Event(MESSAGES):
     for MESSAGE in MESSAGES:
-        match MESSAGE[5]:
-            case "E":
-                com.Log("ERROR: wrong command sent")
+        try:
+            match MESSAGE[5]:
+                
+                case "E":
+                    com.Log("ERROR: wrong command sent")
 
-            case "V":
-                # Command is Valid
-                command = buffer.POP()
-                com.Log(com.DECODE_LINE(command, Comps))
+                case "V":
+                    # Command is Valid
+                    command = buffer.POP()
+                    com.Log(com.DECODE_LINE(command, Comps))
 
-            case "F":
-                arduinos[0].free()
-                    
-            case _:
-                pass
+                case "F":
+                    arduinos[0].free()
+                        
+                case _:
+                    pass
+        except IndexError: 
+            pass
     return
 
 def task():
@@ -800,16 +1145,17 @@ def task():
     # Handle multi-arduino two-way communication
     if len(arduinos):
         # Check if arduinos are not busy and the buffer is not empty
-        if (arduinos[0].state==False) and (buffer.Left()>0):
+        if (arduinos[0].state==False) and (buffer.Length()>0):
             # Handle next command in buffer 
             # command is not removed from buffer yet except for notifications (immidiatly popped)
             buffer.OUT()
             # if buffer was not blocked and buffer is not empty => arduino command sent to serial 
-            if not buffer.blocked and (buffer.Left()>0):
+            if not buffer.blocked and (buffer.Length()>0):
                 # keep track of current device busy
                 device = buffer.READ_DEVICE()
-                # Set all arduinos to busy
-                arduinos[0].busy()
+                if device!='NOTIF': 
+                    # Set all arduinos to busy
+                    arduinos[0].busy()
 
         # wait for response from current device busy
         try:
@@ -1096,7 +1442,9 @@ def Op_mode(addr):
         
 #---------- GUI Thread -------------#
 def GUI():
-    global gui
+    global gui, top 
+    top = P_Login()
+    top.mainloop()
     gui = Main()
     gui.after(100,task)
     gui.after(200,GUI_Server_Comms)

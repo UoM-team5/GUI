@@ -119,8 +119,14 @@ def PRETTY_LINE(command):
         case "M":
             #mixer
             num = pk_split[1][1]
-            state = pk_split[2][1]
+            state = pk_split[2][1:]
             return "Mixer state {}".format(state)
+        
+        case "E":
+            num = pk_split[1][1]
+            state = pk_split[2][1:]
+            return "Extract state {} ".format(state)
+        
         case _:
             return out + " unrecognised cmd package: " + PK
 
@@ -326,6 +332,33 @@ def WASH(Comps):
         valve_states(Comps.valves, 5)
         Comps.pumps[3].pump(40)
 
+class Cabin():
+    """
+    set_cabin_height(cm): store cabin height and calculates dosage rate
+    get_dose_rate: returns dose_rate
+    D2T(dosage): converts dosage to time
+    """
+    def __init__(self, cabin_height = 58.5):
+        self.set_cabin_height(cabin_height)
+
+    def set_cabin_height(self, cabin_height):
+        """Update cabinet height and Calculate dosage rate (Gy/min)"""
+        if 41<=cabin_height<=58.5:
+            self.cabin_height = cabin_height
+            self.dose_rate = round(17745/((cabin_height-11.3)**2.095), 2)
+        else:
+            print('cabin height selected is out of boundaries')
+    
+    def get_dose_rate(self):
+        """return Dosage rate for specified cabinet height (Gy/min) """
+        print('dose rate = {} Gy/min', self.dose_rate)
+        return self.dose_rate
+    
+    def D2T(self, dosage): 
+        """Convert Dosage (Gy) to radiation time (s)"""
+        time = 60*dosage/self.dose_rate
+        return time
+
 class notif():
     def __init__(self, app_token = 'adehgb6cn6939abbvchyaj7pt7yst', user_key = 'usoz8aw4jmejvo8mr29i49cwm26gyd'):
         self.app_token=app_token
@@ -434,7 +467,11 @@ class Shutter:
         self.num = component_number
         self.buffer = buffer
         self.state = 0
-         
+    
+    def set_to(self, state: int):
+        if 0<=state<=2:
+            self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S{}]".format(self.ID, self.num, state)])
+
     def close(self):
         self.buffer.IN([self.device, "[sID1000 rID{} PK2 I{} S1]".format(self.ID, self.num)])
 
@@ -567,16 +604,15 @@ class Buffer:
                 elif self.buffer[0][0]=='NOTIF':
                     self.phone.send(self.buffer[0][1])
                     self.POP()
-
-            if (not self.blocked) and len(self.buffer):
-                WRITE(*self.buffer[0])
+                    return
+                else:
+                    WRITE(*self.buffer[0])
                 
             if self.blocked:
                 if datetime.datetime.now().timestamp()>self.time_to_unblock:
                     print('Unblocked')
                     self.blocked=False
                     self.POP()
-                    WRITE(*self.buffer[0])
             
     def POP(self):
         if len(self.buffer):
@@ -601,7 +637,7 @@ class Buffer:
     def READ_DEVICE(self) :
         return self.buffer[0][0]
     
-    def Left(self):
+    def Length(self):
         #print("length of buffer:", len(self.buffer))
         return len(self.buffer)
 
