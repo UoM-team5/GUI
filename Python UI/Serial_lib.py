@@ -1,280 +1,417 @@
 import serial
 import serial.tools.list_ports
-import csv, datetime, os, requests, cv2
+import csv, datetime, os, requests, cv2, random, time
+import matplotlib
+matplotlib.use("TkAgg")
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+from matplotlib import style
 from chump import Application
 
-def ID_PORTS_AVAILABLE():
-    devices = []
-    for port in ['COM%s' % (i + 1) for i in range(256)]:
-        try:
-            s = serial.Serial(port)
-            s.close()
-            devices.append(port)
-            print('port found: ', port)
-        except (OSError, serial.SerialException):
-            pass
-    
-    return devices
+style.use("ggplot")
+path = os.path.dirname(os.path.realpath(__file__))
 
-def CLOSE_SERIAL_PORT(arduinos):
-    try:
-        for arduino in arduinos:
-            arduino.device.close()
-            print('arduino closed ', arduino.device)
-    except:
-        pass
-
-def OPEN_SERIAL_PORT(DEV):
-    try:
-        Dev = serial.Serial(port=DEV,baudrate=115200, timeout=.1)
-        Dev.isOpen()
-    except IOError:
-        Dev.close()
-        Dev = serial.Serial(port=DEV,baudrate=115200, timeout=.1)
-        Dev.isOpen()
-    except (OSError, serial.SerialException,ValueError):
-        return None
-    
-    return Dev
-
-def OPEN_SERIAL_PORTS(DEVS):
-    DEVICES = []
-    try:
-        for i in range(len(DEVS)):
-            try:
-                Dev = serial.Serial(port=DEVS[i],baudrate=115200, timeout=.1)
-                print(Dev)
-                Dev.isOpen()
-                DEVICES.append(Dev)
-            except IOError:
-                Dev.close()
-                Dev = serial.Serial(port=DEVS[i],baudrate=115200, timeout=.1)
-                Dev.isOpen()
-                DEVICES.append(Dev)
-            except (OSError, serial.SerialException,ValueError):
-                pass
-        
-        return DEVICES
-    except:
-        return []
-
-def SERIAL_READ_LINE(DEV):
-    try:
-        Incoming_Data = DEV.readlines()
-        Incoming_Data = DECODE_LINES(Incoming_Data)
-        FLUSH_PORT(DEV) 
-        return Incoming_Data
-    except (NameError,IOError,ValueError):
-        pass
-    return [-1]
-
-def DECODE_LINES(cmd_list):
-    for i in range(0,len(cmd_list)):
-        cmd_list[i] = cmd_list[i].decode('UTF-8').replace('\r\n','')
-        cmd_list[i] = DECODE_LINE(cmd_list[i])
-        print(cmd_list[i])
-    return cmd_list
-
-def DECODE_LINE(command, Comps = None):
-    if command[0]!="[" or command[-1]!="]":
-        return "- " + command 
-    cmd_strip = command[1:-1]
-    cmd_split = cmd_strip.split(" ", 2)
-    senderID = cmd_split[0][3:]
-    receiveID = cmd_split[1]
-    PK = cmd_split[2]
-    return DECODE_PACKAGE(senderID, PK, Comps)
-
-def PRETTY_LINE(command):
-    if command[0]!="[" or command[-1]!="]":
-        return "- " + command 
-    cmd_strip = command[1:-1]
-    cmd_split = cmd_strip.split(" ", 2)
-    senderID = cmd_split[0][3:]
-    receiveID = cmd_split[1]
-    PK = cmd_split[2]
-    n_pk = int(PK[2:4])
-    pk_split = PK.split(" ", n_pk)
-    operator = MyStr(pk_split[1])
-    out = str(senderID)
-    match operator[0]:
-        case "P":
-            #Pump: [sID... rID PK3 P1 m10.2]
-            num = int(pk_split[1][1])
-            vol = float(pk_split[2][1:])
-            return "Pump {}: volume {} ".format(num, vol)
-        
-        case "V":
-            #Valve: [sID... rID PK2 V1 S]
-            num = pk_split[1][1]
-            state = pk_split[2][1]
-            return "Valve {}: state {} ".format(num, state)
-        
-        case "I":
-            #Shutter: [sID... rID PK2 V1 S]
-            num = pk_split[1][1]
-            state = pk_split[2][1]
-            return "Shutter state {} ".format(state)
-        
-        case "M":
-            #mixer
-            num = pk_split[1][1]
-            state = pk_split[2][1:]
-            return "Mixer state {}".format(state)
-        
-        case "E":
-            num = pk_split[1][1]
-            state = pk_split[2][1:]
-            return "Extract state {} ".format(state)
-        
-        case _:
-            return out + " unrecognised cmd package: " + PK
 
 class MyStr(str):
     def __eq__(self, other):
         return self.__contains__(other)
 
-def DECODE_PACKAGE(senderID, PK, Comps):
-    n_pk = int(PK[2:4])
-    pk_split = PK.split(" ", n_pk)
-    operator = MyStr(pk_split[1])
-    out = str(senderID)
-    if n_pk==1:
-        # single package commands
-        match operator:
-            case "ERR":
-                out += " ERROR"
-                match operator[3]:
-                    case "0":
-                        return (out + " 0: Incorrect packet format")
-                    case "1":
-                        return (out + " 1: Packet missing items")
-                    case "2":
-                        return (out + " 2: Incorrect Device ID")
-                    case "3":
-                        return (out + " 3: Incorrect Sender ID")
-                    case "4":
-                        return (out + " 4: System is in error state.")
-                    case _:
-                        print("Unkown Error number {}".format(operator[3]))
+class Comms:
+    def __init__(self, Comps):
+        self.Comps = Comps
+        self.current_command = ''
+    
+    def ID_PORTS_AVAILABLE(self):
+        devices = []
+        for port in ['COM%s' % (i + 1) for i in range(256)]:
+            try:
+                s = serial.Serial(port)
+                s.close()
+                devices.append(port)
+                print('port found: ', port)
+            except (OSError, serial.SerialException):
+                pass
+        
+        return devices
 
-            case "ACK":
-                return (out + " Acknowledge")
+    def CLOSE_SERIAL_PORT(self, arduinos):
+        try:
+            for arduino in arduinos:
+                arduino.device.close()
+                print('arduino closed ', arduino.device)
+        except:
+            pass
 
-            case "BUSY":
-                return (out + " BUSY")
+    def OPEN_SERIAL_PORT(self, DEV):
+        try:
+            Dev = serial.Serial(port=DEV,baudrate=115200, timeout=.1)
+            Dev.isOpen()
+        except IOError:
+            Dev.close()
+            Dev = serial.Serial(port=DEV,baudrate=115200, timeout=.1)
+            Dev.isOpen()
+        except (OSError, serial.SerialException,ValueError):
+            return None
+        
+        return Dev
 
-            case "VALID": 
-                senderID = senderID
-                return (out + " VALID")
-
-            case "FREE":
-                return (out + " FREE")
+    def OPEN_SERIAL_PORTS(self, DEVS):
+        DEVICES = []
+        try:
+            for i in range(len(DEVS)):
+                try:
+                    Dev = serial.Serial(port=DEVS[i],baudrate=115200, timeout=.1)
+                    print(Dev)
+                    Dev.isOpen()
+                    DEVICES.append(Dev)
+                except IOError:
+                    Dev.close()
+                    Dev = serial.Serial(port=DEVS[i],baudrate=115200, timeout=.1)
+                    Dev.isOpen()
+                    DEVICES.append(Dev)
+                except (OSError, serial.SerialException,ValueError):
+                    pass
             
-            case _:
-                return out + " unrecognised package: " + PK
-    else:
-        #multi package commands 
+            return DEVICES
+        except:
+            return []
+
+    def SERIAL_READ_LINE(self, DEV):
+        try:
+            Incoming_Data = DEV.readlines()
+            Incoming_Data = self.DECODE_LINES(Incoming_Data)
+            self.FLUSH_PORT(DEV) 
+            return Incoming_Data
+        except (NameError,IOError,ValueError):
+            pass
+        return [-1]
+
+    def DECODE_LINES(self, cmd_list):
+        for i in range(0,len(cmd_list)):
+            cmd_list[i] = cmd_list[i].decode('UTF-8').replace('\r\n','')
+            cmd_list[i] = self.DECODE_LINE(cmd_list[i])
+            print(cmd_list[i])
+        return cmd_list
+
+    def DECODE_LINE(self, command):
+        if command[0]!="[" or command[-1]!="]":
+            return "- " + command 
+        cmd_strip = command[1:-1]
+        cmd_split = cmd_strip.split(" ", 2)
+        senderID = cmd_split[0][3:]
+        receiveID = cmd_split[1]
+        PK = cmd_split[2]
+        return self.DECODE_PACKAGE(senderID, PK)
+
+    def PRETTY_LINE(self, command):
+        if command[0]!="[" or command[-1]!="]":
+            return "- " + command 
+        cmd_strip = command[1:-1]
+        cmd_split = cmd_strip.split(" ", 2)
+        senderID = cmd_split[0][3:]
+        receiveID = cmd_split[1]
+        PK = cmd_split[2]
+        n_pk = int(PK[2:4])
+        pk_split = PK.split(" ", n_pk)
+        operator = MyStr(pk_split[1])
+        out = str(senderID)
         match operator[0]:
             case "P":
                 #Pump: [sID... rID PK3 P1 m10.2]
                 num = int(pk_split[1][1])
                 vol = float(pk_split[2][1:])
-                if num==(1 or 2 or 3):
-                    try: 
-                        Comps.ves_in[num-1].sub(float(vol))
-                        Comps.ves_main.add(float(vol))
-                    except:
-                        pass
-                if num==4:
-                    Comps.ves_main.sub(float(vol))
-                    Comps.ves_out[Comps.valves.output_vessel].add(float(vol))
                 return "Pump {}: volume {} ".format(num, vol)
             
             case "V":
                 #Valve: [sID... rID PK2 V1 S]
                 num = pk_split[1][1]
                 state = pk_split[2][1]
-                print("Valve num {}, state {} ".format(num, state))
                 return "Valve {}: state {} ".format(num, state)
             
             case "I":
                 #Shutter: [sID... rID PK2 V1 S]
                 num = pk_split[1][1]
                 state = pk_split[2][1]
-                Comps.shutter.set_state(state)
                 return "Shutter state {} ".format(state)
             
             case "M":
                 #mixer
                 num = pk_split[1][1]
-                state = pk_split[2][1]
-                print("Mixer num {}, state {} ".format(num, state))
+                state = pk_split[2][1:]
                 return "Mixer state {}".format(state)
             
-            case "E": 
+            case "E":
                 num = pk_split[1][1]
                 state = pk_split[2][1:]
-                Comps.extract.current_slot = state
                 return "Extract state {} ".format(state)
             
-            case "S": 
-                out += " sensors "
-                for idx in range(len(pk_split)):
-                    try:
-                        match pk_split[idx][0]:
-                            case 'T':
-                                senType = 'Temperature'
-                                Comps.Temp[int(pk_split[idx][1])-1] = pk_split[idx+1][1:]
-                            case 'B':
-                                senType = 'Bubble'
-                                Comps.Bubble[int(pk_split[idx][1])-1] = pk_split[idx+1][1:]
-                            case 'L':
-                                senType = 'Liquid Detection'
-                                Comps.LDS[int(pk_split[idx][1])-1] = pk_split[idx+1][1:]
-                            case _:
-                                pass
-                    except:
-                        print('Error: extra ', senType,' sensor detected')
-
             case _:
-                print("operator ",operator)
                 return out + " unrecognised cmd package: " + PK
 
-def SERIAL_WRITE_LINE(DEV,COMMAND):
-    try:
-        print("\nSent to Serial ==>", COMMAND)
-        DEV.write(COMMAND.encode('UTF-8'))
-        return 1
-    except:
-        return -1
+    def DECODE_PACKAGE(self, senderID, PK):
+        n_pk = int(PK[2:4])
+        pk_split = PK.split(" ", n_pk)
+        operator = MyStr(pk_split[1])
+        out = str(senderID)
+        if n_pk==1:
+            # single package commands
+            match operator:
+                case "ERR":
+                    out += " ERROR"
+                    match operator[3]:
+                        case "0":
+                            out += " 0: Incorrect packet format"
+                        case "1":
+                            out += " 1: Packet missing items"
+                        case "2":
+                            out += " 2: Incorrect Device ID"
+                        case "3":
+                            out += " 3: Incorrect Sender ID"
+                        case "4":
+                            out += " 4: System is in error state."
+                        case _:
+                            out += "Unkown Error number {}".format(operator[3])
+                    Log(out)
+                    return out
 
-def WRITE(DEV,COMMAND):
-    STATE = -1
-    TRY = 0
-    while(STATE == -1):
-        STATE = SERIAL_WRITE_LINE(DEV,COMMAND)
-        TRY = TRY + 1
-        if(TRY>10):
+                case "ACK":
+                    return (out + " Acknowledge")
+
+                case "BUSY":
+                    return (out + " BUSY")
+
+                case "VALID": 
+                    # temperature commands do not pass through buffer; Do not pop 
+                    if not ('SEN' in self.DECODE_LINE(self.current_command)):
+                        command = self.Comps.buffer.POP()
+                        Log(self.DECODE_LINE(command))
+                    return (out + " VALID")
+
+                case "FREE":
+                    try:
+                        self.Comps.arduinos[0].free()
+                    except:
+                        pass
+                    return (out + " FREE")
+                
+                case "R":
+                    return (out + " SEN")
+                
+                case _:
+                    return out + " unrecognised package: " + PK
+        else:
+            #multi package commands 
+            match operator[0]:
+                case "P":
+                    #Pump: [sID... rID PK3 P1 m10.2]
+                    num = int(pk_split[1][1])
+                    vol = float(pk_split[2][1:])
+                    if num==(1 or 2 or 3):
+                        try: 
+                            self.Comps.ves_in[num-1].sub(float(vol))
+                            self.Comps.ves_main.add(float(vol))
+                        except:
+                            pass
+                    if num==4:
+                        self.Comps.ves_main.sub(float(vol))
+                        self.Comps.ves_out[self.Comps.valves.output_vessel].add(float(vol))
+                    return "Pump {}: volume {} ".format(num, vol)
+                
+                case "V":
+                    #Valve: [sID... rID PK2 V1 S]
+                    num = pk_split[1][1]
+                    state = pk_split[2][1]
+                    print("Valve num {}, state {} ".format(num, state))
+                    return "Valve {}: state {} ".format(num, state)
+                
+                case "I":
+                    #Shutter: [sID... rID PK2 V1 S]
+                    num = pk_split[1][1]
+                    state = pk_split[2][1]
+                    self.Comps.shutter.set_state(state)
+                    return "Shutter state {} ".format(state)
+                
+                case "M":
+                    #mixer
+                    num = pk_split[1][1]
+                    state = pk_split[2][1]
+                    print("Mixer num {}, state {} ".format(num, state))
+                    return "Mixer state {}".format(state)
+                
+                case "E": 
+                    num = pk_split[1][1]
+                    state = pk_split[2][1:]
+                    self.Comps.extract.current_slot = state
+                    return "Extract state {} ".format(state)
+                
+                case "S": 
+                    out += " sensors "
+
+                    for idx in range(len(pk_split)):
+                        try:
+                            match pk_split[idx][0]:
+                                case 'T':
+                                    senType = 'Temperature'
+                                    T = float(pk_split[idx+1][1:])
+                                    self.Comps.Temp.new_temp(T)
+                                    out += "Temp {} °C".format(T)
+                                case 'B':
+                                    senType = 'Bubble'
+                                    bub_num = int(pk_split[idx][1])
+                                    bub_state = pk_split[idx+1][1:]
+                                    self.Comps.Bubble[int(pk_split[idx][1])-1] = pk_split[idx+1][1:]
+                                    out += "Bubble {}, state {}".format(bub_num, bub_state)
+                                case 'L':
+                                    senType = 'Liquid Detection'
+                                    lds_num = int(pk_split[idx][1])
+                                    lds_state = int(pk_split[idx+1][1])
+                                    self.Comps.LDS[lds_num-1].state = lds_state
+                                    if lds_state==False:
+                                        print('fill vessel input module ', lds_num)
+                                    out += "=LDS {} state {}".format(lds_num, lds_state)
+
+                                case _:
+                                    pass
+                        except:
+                            print('Sensor polling error')
+                    return out
+
+                case _:
+                    print("operator ",operator)
+                    return out + " unrecognised cmd package: " + PK
+
+    def SERIAL_WRITE_LINE(self, DEV,COMMAND):
+        try:
+            print("\nSent to Serial ==>", COMMAND)
+            DEV.write(COMMAND.encode('UTF-8'))
+            return 1
+        except:
             return -1
-    return STATE
 
-def READ(DEV):
-    STATE = -1
-    TRY = 0
-    while(STATE == -1):
-        STATE = SERIAL_READ_LINE(DEV)
-        TRY = TRY + 1
-        if(TRY>10):
-            return -1
-    return STATE
+    def WRITE(self, DEV, COMMAND):
+        self.current_command = COMMAND
+        STATE = -1
+        TRY = 0
+        while(STATE == -1):
+            STATE = self.SERIAL_WRITE_LINE(DEV,COMMAND)
+            TRY = TRY + 1
+            if(TRY>10):
+                return -1
+        return STATE
 
-def FLUSH_PORT(DEV):
-    try:
-        for i in range(len(DEV)):
-            DEV[i].flushInput()
-    except:
-        pass
+    def READ(self, DEV):
+        STATE = -1
+        TRY = 0
+        try:
+            while(STATE == -1):
+                if (DEV.inWaiting() > 0):
+                    STATE = self.SERIAL_READ_LINE(DEV)
+                TRY = TRY + 1
+                if(TRY>10):
+                    return -1
+            return STATE
+        except:
+            pass
+
+    def FLUSH_PORT(self, DEV):
+        try:
+            for i in range(len(DEV)):
+                DEV[i].flushInput()
+        except:
+            pass
+
+class Buffer:
+    '''
+    'First In, First Out' buffer \n
+    use IN method to add new commands to the list\n
+    use OUT method to execute commands from the list
+    '''
+    def __init__(self, Comms, Comps, size=100):
+        self.buffer = []
+        self.size = size
+        self.blocked=False
+        self.Comms = Comms
+        self.Comps = Comps
+        self.current_device = None
+    
+    def IN(self, device_command: list):
+        '''
+        add new command to the buffer list
+        '''
+        if len(self.buffer)<self.size:
+            self.buffer.append(device_command)
+        else: 
+            print("buffer full")
+
+    def OUT(self):
+        '''
+        Exectute next command in the buffer List
+        3 types : Package, Block, Notification
+        '''
+        try: 
+            if len(self.buffer) and self.Comps.arduinos[0].state==False:
+                if (not self.blocked):
+                    if self.buffer[0][0]=='WAIT':
+                        print('Blocked')
+                        self.START_BLOCK()
+                    elif self.buffer[0][0]=='NOTIF':
+                        self.phone.send(self.buffer[0][1])
+                        self.POP()
+                        return
+                    else:
+                        dev, com = [*self.buffer[0]]
+                        self.Comms.WRITE(dev, com)
+                        self.Comps.arduinos[0].busy()
+                        self.current_device = self.buffer[0][0]
+                    
+                if self.blocked:
+                    if datetime.datetime.now().timestamp()>self.time_to_unblock:
+                        print('Unblocked')
+                        self.blocked=False
+                        self.POP()
+        except:
+            pass
+            
+    def POP(self):
+        '''Delete executed/Validated command from list'''
+        if len(self.buffer):
+            print("pop")
+            device, command = self.buffer.pop(0)
+            return command
+    
+    def POP_LAST(self):
+        if len(self.buffer):
+            device, command = self.buffer.pop(-1)
+            print(command)
+            return command
+        
+    def READ(self):
+        '''returns the current list of commands in the buffer'''
+        command_list=[]
+        device_list=[]
+        for content in self.buffer: 
+            device_list.append(content[0])
+            command_list.append(self.Comms.PRETTY_LINE(content[1]))
+        return command_list
+
+    def Length(self):
+        #print("length of buffer:", len(self.buffer))
+        return len(self.buffer)
+
+    def RESET(self):
+        self.buffer = []
+
+    def BLOCK(self, seconds: float):
+        self.seconds = seconds
+        self.buffer.append(['WAIT', str(seconds)])
+    
+    def START_BLOCK(self):
+        start_time = datetime.datetime.now().timestamp()
+        self.time_to_unblock = self.seconds + start_time
+        self.blocked = True
+
+    def NOTIFY(self, text = 'DONE'):
+        self.buffer.append(['NOTIF', text])
 
 def Log(command, file_name = "commands.csv"):
     nowTime = datetime.datetime.now()
@@ -324,13 +461,14 @@ def read_detail(filename:str):
     
 def WASH(Comps):
     for i in range(3):
+        #close the shutter, put water solution in the reactor, mix, extract to waste
         Comps.shutter.close()
-        Comps.pumps[2].pump(40)
-        Comps.mixer.mix(1) #what are options for speed?
-        #Comps.buffer.BLOCK()
+        Comps.pumps[2].pump(20)
+        Comps.mixer.mix(100) 
+        Comps.buffer.BLOCK()
         Comps.mixer.mix(0)
         valve_states(Comps.valves, 5)
-        Comps.pumps[3].pump(40)
+        Comps.pumps[3].pump(20)
 
 class Cabin():
     """
@@ -396,18 +534,23 @@ class notif():
         })
 #components
 class Pump:
-    def __init__(self, device, ID, component_number: int, buffer):
+    def __init__(self, device, ID, component_number: int, buffer, LDS=None):
         self.device = device
         self.ID = ID
         self.buffer = buffer
         self.num = component_number
         self.state = False
+        self.LDS= LDS
     
     def pump(self, volume: float):
         if volume==0.0:
             return
         else:
-            self.buffer.IN([self.device, "[sID1000 rID{} PK3 P{} m{:.2f}]".format(self.ID, self.num, volume)])
+            if self.LDS!=None:
+                print('polling')
+
+                #self.LDS.poll()
+            self.buffer.IN([self.device, "[sID1000 rID{} PK3 P{} m{:.3f}]".format(self.ID, self.num, volume)])
     
     def set_state(self, state: bool):
         """Param bool state: set False->idle, True->used"""
@@ -540,6 +683,96 @@ class Vessel:
     def get_name(self):
         return self.name
 
+class LDS:
+    def __init__(self, device, ID, Comms):
+        self.device = device
+        self.ID = ID
+        self.Comms = Comms
+        self.state=True
+
+    def poll(self):
+        self.Comms.WRITE(self.device, "[sID1000 rID{} PK1 R]".format(self.ID))
+        self.Comms.READ(self.device)
+    
+    def get_state(self):
+        return self.state
+    
+class Temp:
+    def __init__(self, device, ID, Comms):
+        self.device = device
+        self.ID = ID
+        self.Comms = Comms
+        self.graphs = []
+        self.get_all()
+    
+    def poll(self):
+        try:
+            self.Comms.WRITE(self.device, "[sID1000 rID{} PK1 R]".format(self.ID))
+        except:
+            pass
+        time.sleep(0.01)
+        self.Comms.READ(self.device)
+
+    def get_all(self):
+        Temp_record = open(os.path.join(path, 'static\\', 'temperature_record.csv'),'r').read()
+        dataArray = Temp_record.split('\n')
+        xar=[]
+        yar=[]
+        for eachLine in dataArray:
+            if len(eachLine)>1:
+                x,y = eachLine.split(',')
+                xar.append(int(x))
+                yar.append(int(y))
+        self.xar = xar
+        self.yar = yar
+        return self.yar
+    
+    def new_temp(self, new_temp = 0):
+        Temp_record = open(os.path.join(path, 'static\\', 'temperature_record.csv'),"a")
+        #remove next line later
+        new_temp = random.randint(10,50)
+        Temp_record.write(f"{1},{new_temp}\n")
+        Temp_record.close()
+        self.xar.append(1)
+        self.yar.append(new_temp)
+        self.update_graphs()
+
+    def get_last(self):
+        print(self.yar[-1])
+        return self.yar[-1]
+    
+    def new_graph(self, graph):
+        # Add new graph object instance to list of graphs
+        self.graphs.append(graph)
+        self.update_graphs()
+    
+    def update_graphs(self):
+        # update all the graphs at once
+        for graph in self.graphs:
+            graph.animate(self.yar)
+
+class Graph:
+    '''
+    Add instance of a graph in a Tkinter frame
+    with MatplotLib package
+    '''
+    def __init__(self, frame, visible=20):
+        self.visible=visible
+        self.f = Figure(figsize=(5,5), dpi=100)
+        self.a = self.f.add_subplot(111)
+        canvas = FigureCanvasTkAgg(self.f, frame)
+        canvas.draw()
+        canvas.get_tk_widget().place(relx=0.5, rely=0.5, relwidth=1, relheight=1, anchor='center')
+        self.canvas=canvas
+        self.animate()
+    
+    def animate(self, yar=[0]):
+        if len(yar)>self.visible:
+            yar = yar[-self.visible:]
+        self.a.clear()
+        self.a.plot(yar)
+        self.canvas.draw()
+
 class Components:
     def __init__(self):
         self.modules = ['no arduino connected']
@@ -582,76 +815,3 @@ class Nano:
     def read_last(self):
         return self.message
 
-# FIFO Buffer
-class Buffer:
-    def __init__(self, size=20):
-        self.buffer = []
-        self.size = size
-        self.blocked=False
-
-    def IN(self, device_command: list):
-        if len(self.buffer)<self.size:
-            self.buffer.append(device_command)
-        else: 
-            print("buffer full")
-
-    def OUT(self):
-        if len(self.buffer):
-            if (not self.blocked):
-                if self.buffer[0][0]=='WAIT':
-                    print('Blocked')
-                    self.START_BLOCK()
-                elif self.buffer[0][0]=='NOTIF':
-                    self.phone.send(self.buffer[0][1])
-                    self.POP()
-                    return
-                else:
-                    WRITE(*self.buffer[0])
-                
-            if self.blocked:
-                if datetime.datetime.now().timestamp()>self.time_to_unblock:
-                    print('Unblocked')
-                    self.blocked=False
-                    self.POP()
-            
-    def POP(self):
-        if len(self.buffer):
-            print("pop")
-            device, command = self.buffer.pop(0)
-            return command
-    
-    def POP_LAST(self):
-        if len(self.buffer):
-            device, command = self.buffer.pop(-1)
-            print(command)
-            return command
-        
-    def READ(self) :
-        command_list=[]
-        device_list=[]
-        for content in self.buffer: 
-            device_list.append(content[0])
-            command_list.append(PRETTY_LINE(content[1]))
-        return command_list
-
-    def READ_DEVICE(self) :
-        return self.buffer[0][0]
-    
-    def Length(self):
-        #print("length of buffer:", len(self.buffer))
-        return len(self.buffer)
-
-    def RESET(self):
-        self.buffer = []
-
-    def BLOCK(self, seconds: float):
-        self.seconds = seconds
-        self.buffer.append(['WAIT', str(seconds)])
-    
-    def START_BLOCK(self):
-        start_time = datetime.datetime.now().timestamp()
-        self.time_to_unblock = self.seconds + start_time
-        self.blocked = True
-
-    def NOTIFY(self, text = 'DONE'):
-        self.buffer.append(['NOTIF', text])
