@@ -1079,7 +1079,7 @@ def sensor_update():
 
 #Global 
 # Queues and pipes to share and communicate between threads
-global web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn
+global web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn, T_Que
 
 # Grabs the latest frame and puts it onto a Queue for the webpage to read and display
 def GUI_Server_Comms():
@@ -1109,6 +1109,11 @@ def GUI_Server_Comms():
                 pass
     elif CMD_rev.poll(timeout=0.001):
         CMD_rev.recv()
+    #try:
+    #    Temp_Que.put(random.randint(20,30))
+    #except:
+    #    pass
+    #Temp_Que.put(Comps.Temp.get_last())
     gui.after(200,GUI_Server_Comms) # executes it every 200ms 
 
 app = Flask(__name__) #main web application
@@ -1244,6 +1249,11 @@ def table():
             Current = C_CMD.get(block = False) #Reads current command 
         except: 
             Current = "N/A"
+       
+        try:
+            temp_val = random.randint(2000,3000)/100#T_Que.get(block = False)
+        except:
+            temp_val = 0
 
         #To edit the webpage HTML file with the python data
         template = {
@@ -1251,7 +1261,8 @@ def table():
             'N1' : Next[0], #the next 4 commands
             'N2' : Next[1],
             'N3' : Next[2],
-            'N4' : Next[3]
+            'N4' : Next[3],
+            'temp': temp_val
         }
         return render_template('command.html', **template) #Renders webpage         
     else:
@@ -1343,11 +1354,12 @@ def GUI():
     # gui.mainloop()
 
 #------- Webserver Thread ----------#
-def Server(Q, L, N, K, P):
-    global app, web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn
+def Server(Q, L, N, K, P, T):
+    global app, web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn, T_Que
     web_frame = Q
     C_CMD = L
     N_CMD = N
+    #T_Que = T
     Kill_Conn = K
     CMD_Conn = P
     if __name__ == '__mp_main__':
@@ -1358,9 +1370,10 @@ if __name__ == "__main__":
     Frames = multiprocessing.Queue(5)
     Current_cmd = multiprocessing.Queue(1)
     Next_cmd = multiprocessing.Queue(4)
+    #Temp_Que = multiprocessing.Queue(5)
     Kill_rev, Kill_send = multiprocessing.Pipe(duplex = False)
     CMD_rev, CMD_send = multiprocessing.Pipe(duplex = False)
-    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, CMD_send))
+    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, CMD_send, 0))
     server.start()
     GUI()
     server.terminate()
