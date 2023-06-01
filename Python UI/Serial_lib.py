@@ -1,12 +1,13 @@
 import serial
+import tkinter as tk
 import serial.tools.list_ports
 import csv, datetime, os, requests, cv2, random, time
 import matplotlib
-matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from matplotlib import style
 from chump import Application
+matplotlib.use("TkAgg")
 
 style.use("ggplot")
 path = os.path.dirname(os.path.realpath(__file__))
@@ -83,6 +84,7 @@ class Comms:
             self.FLUSH_PORT(DEV) 
             return Incoming_Data
         except (NameError,IOError,ValueError):
+            print('error in Serial_Read_Line')
             pass
         return [-1]
 
@@ -153,6 +155,7 @@ class Comms:
         pk_split = PK.split(" ", n_pk)
         operator = MyStr(pk_split[1])
         out = str(senderID)
+
         if n_pk==1:
             # single package commands
             match operator:
@@ -182,7 +185,8 @@ class Comms:
 
                 case "VALID": 
                     # temperature commands do not pass through buffer; Do not pop 
-                    if not ('SEN' in self.DECODE_LINE(self.current_command)):
+                    # print(self.current_command)
+                    if not ('R' in self.current_command):
                         command = self.Comps.buffer.POP()
                         Log(self.DECODE_LINE(command))
                     return (out + " VALID")
@@ -265,10 +269,10 @@ class Comms:
                                     senType = 'Liquid Detection'
                                     lds_num = int(pk_split[idx][1])
                                     lds_state = int(pk_split[idx+1][1])
-                                    self.Comps.LDS[lds_num-1].state = lds_state
                                     if lds_state==False:
-                                        print('fill vessel input module ', lds_num)
-                                    out += "=LDS {} state {}".format(lds_num, lds_state)
+                                        print(str(senderID), 'Fill vessel input module ')
+                                        #tk.messagebox.showinfo("ACTTION REQUIRED", "Vessel Empty!\nFill vessel input module {}".format(str(senderID)))
+                                    out += " LDS {} state {}".format(lds_num, lds_state)
 
                                 case _:
                                     pass
@@ -290,6 +294,7 @@ class Comms:
 
     def WRITE(self, DEV, COMMAND):
         self.current_command = COMMAND
+        # print('current com', self.current_command)
         STATE = -1
         TRY = 0
         while(STATE == -1):
@@ -540,17 +545,15 @@ class Pump:
         self.buffer = buffer
         self.num = component_number
         self.state = False
-        self.LDS= LDS
+        self.LDS = LDS
     
     def pump(self, volume: float):
         if volume==0.0:
             return
         else:
             if self.LDS!=None:
-                print('polling')
-
-                #self.LDS.poll()
-            self.buffer.IN([self.device, "[sID1000 rID{} PK3 P{} m{:.3f}]".format(self.ID, self.num, volume)])
+                self.LDS.poll()
+            self.buffer.IN([self.device, "[sID1000 rID{} PK2 P{} m{:.3f}]".format(self.ID, self.num, volume)])
     
     def set_state(self, state: bool):
         """Param bool state: set False->idle, True->used"""
@@ -637,8 +640,17 @@ class Mixer:
         self.num = component_number
         self.buffer = buffer
 
-    def mix(self, speed: int):
-        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, speed)])
+    def mix_slow(self):
+        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 80)])
+    
+    def mix(self):
+        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 100)])
+    
+    def mix_fast(self):
+        self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 120)])
+
+    def stop(self):
+        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 0)])
 
 class Extract:
     def __init__(self, device, ID, component_number: int, buffer, n_slots):
@@ -689,21 +701,37 @@ class LDS:
         self.ID = ID
         self.Comms = Comms
         self.state=True
+        self.tk = tk
 
     def poll(self):
-        self.Comms.WRITE(self.device, "[sID1000 rID{} PK1 R]".format(self.ID))
+        try:
+            self.Comms.WRITE(self.device, "[sID1000 rID{} PK1 R]".format(self.ID))
+        except:
+            pass
+        time.sleep(0.01)
         self.Comms.READ(self.device)
     
     def get_state(self):
         return self.state
-    
+   
 class Temp:
     def __init__(self, device, ID, Comms):
         self.device = device
         self.ID = ID
         self.Comms = Comms
         self.graphs = []
-        self.get_all()
+        # self.get_all()
+        self.xar = []
+        self.yar = []
+
+        now = datetime.datetime.now()
+        current_time = now.strftime("%H_%M_%S")
+        name = 'Temperature' + current_time +'.csv'
+        self.path = os.path.join(path, 'results\\', name)
+        f = open(self.path, 'w')
+        writer = csv.writer(f)
+        writer.writerow(["Time", "temperature"])
+        f.close()
     
     def poll(self):
         try:
@@ -712,29 +740,19 @@ class Temp:
             pass
         time.sleep(0.01)
         self.Comms.READ(self.device)
-
-    def get_all(self):
-        Temp_record = open(os.path.join(path, 'static\\', 'temperature_record.csv'),'r').read()
-        dataArray = Temp_record.split('\n')
-        xar=[]
-        yar=[]
-        for eachLine in dataArray:
-            if len(eachLine)>1:
-                x,y = eachLine.split(',')
-                xar.append(int(x))
-                yar.append(int(y))
-        self.xar = xar
-        self.yar = yar
-        return self.yar
     
-    def new_temp(self, new_temp = 0):
-        Temp_record = open(os.path.join(path, 'static\\', 'temperature_record.csv'),"a")
-        #remove next line later
-        new_temp = random.randint(10,50)
-        Temp_record.write(f"{1},{new_temp}\n")
-        Temp_record.close()
-        self.xar.append(1)
-        self.yar.append(new_temp)
+    def new_temp(self, Temp = 0.0):
+        f = open(self.path, 'a')
+        now = datetime.datetime.now()
+        current_time = now.strftime("%H:%M:%S")
+        try:
+            writer = csv.writer(f)
+            writer.writerow([current_time, Temp])
+        except:
+            pass
+        f.close()
+        self.xar.append(current_time)
+        self.yar.append(Temp)
         self.update_graphs()
 
     def get_last(self):
