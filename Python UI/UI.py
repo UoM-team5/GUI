@@ -1251,7 +1251,7 @@ def table():
             Current = "N/A"
        
         try:
-            temp_val = random.randint(2000,3000)/100#T_Que.get(block = False)
+            temp_val = random.randint(2400,2600)/100#T_Que.get(block = False)
         except:
             temp_val = 0
 
