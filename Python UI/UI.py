@@ -1079,7 +1079,7 @@ def sensor_update():
 
 #Global 
 # Queues and pipes to share and communicate between threads
-global web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn, T_Que
+global web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn, TEMP_Conn
 
 # Grabs the latest frame and puts it onto a Queue for the webpage to read and display
 def GUI_Server_Comms():
@@ -1109,10 +1109,10 @@ def GUI_Server_Comms():
                 pass
     elif CMD_rev.poll(timeout=0.001):
         CMD_rev.recv()
-    #try:
-    #    Temp_Que.put(random.randint(20,30))
-    #except:
-    #    pass
+    try:
+        TEMP_send.send(Comps.Temp.get_last())
+    except:
+        TEMP_send.send(-1)
     #Temp_Que.put(Comps.Temp.get_last())
     gui.after(200,GUI_Server_Comms) # executes it every 200ms 
 
@@ -1251,7 +1251,7 @@ def table():
             Current = "N/A"
        
         try:
-            temp_val = random.randint(2400,2600)/100#T_Que.get(block = False)
+            temp_val = TEMP_Conn.recv()#random.randint(2400,2600)/100#T_Que.get(block = False)
         except:
             temp_val = 0
 
@@ -1355,11 +1355,11 @@ def GUI():
 
 #------- Webserver Thread ----------#
 def Server(Q, L, N, K, P, T):
-    global app, web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn, T_Que
+    global app, web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn, TEMP_Conn
     web_frame = Q
     C_CMD = L
     N_CMD = N
-    #T_Que = T
+    TEMP_Conn = T
     Kill_Conn = K
     CMD_Conn = P
     if __name__ == '__mp_main__':
@@ -1370,10 +1370,10 @@ if __name__ == "__main__":
     Frames = multiprocessing.Queue(5)
     Current_cmd = multiprocessing.Queue(1)
     Next_cmd = multiprocessing.Queue(4)
-    #Temp_Que = multiprocessing.Queue(5)
+    TEMP_rev, TEMP_send = multiprocessing.Pipe(duplex = False)
     Kill_rev, Kill_send = multiprocessing.Pipe(duplex = False)
     CMD_rev, CMD_send = multiprocessing.Pipe(duplex = False)
-    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, CMD_send, 0))
+    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, CMD_send, TEMP_rev))
     server.start()
     GUI()
     server.terminate()
