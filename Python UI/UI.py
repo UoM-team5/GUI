@@ -1132,7 +1132,7 @@ def sensor_update():
 
 #Global 
 # Queues and pipes to share and communicate between threads
-global web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn
+global web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn, TEMP_Conn
 
 # Grabs the latest frame and puts it onto a Queue for the webpage to read and display
 def GUI_Server_Comms():
@@ -1162,6 +1162,12 @@ def GUI_Server_Comms():
                 pass
     elif CMD_rev.poll(timeout=0.001):
         CMD_rev.recv()
+    try:
+        TEMP_send.send(Comps.Temp.get_last())
+    except:
+        TEMP_send.send(-1)
+        #this should be a new comment for git 
+    #Temp_Que.put(Comps.Temp.get_last())
     gui.after(200,GUI_Server_Comms) # executes it every 200ms 
 
 app = Flask(__name__) #main web application
@@ -1173,7 +1179,7 @@ logged_in.append(['N/A','N/A'])
 @app.route("/", methods=['GET', 'POST']) # methods of interating and route address
 def Main_page():
     global logged_in
-    if any(request.remote_addr not in User for User in logged_in):
+    if not Check_Creds(request.remote_addr,logged_in,"None"):
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
@@ -1184,7 +1190,7 @@ def Main_page():
                     if creds[1] == Password:
                         logged_in.append([request.remote_addr,creds[2]])
                                            
-    if any(request.remote_addr in User for User in logged_in):    
+    if Check_Creds(request.remote_addr,logged_in,"None"):    
         # Reads all the current commands in the buffer and addes N/A if blank
         Next =[] # list of next 4 commands
         for i in range(0, 4):
@@ -1211,6 +1217,13 @@ def Main_page():
         if request.method == 'POST':
                 if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
                     Kill_Conn.send("kill") # Sends kill command on kill pipe
+                if request.form.get('Log Out') == 'Log Out':
+                    print("Remove Login")
+                    logged_in.remove([request.remote_addr,Op_mode(request.remote_addr)])
+                    template = {
+                        'address': '/',
+                    }
+                    return render_template('login.html', **template) #Renders webpage
                 elif request.form.get('Screenshot') == 'Screenshot':
                     frame = web_frame.get()
                     file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_') + ".jpg"
@@ -1243,10 +1256,10 @@ def gen_frames():
             pass
            
 #Renders a webpage fro pure video streaming which is linked to on main page
-@app.route('/video_feed')
+@app.route('/video_feed', methods=['GET', 'POST'])
 def video_feed():
     global logged_in
-    if any(request.remote_addr not in User for User in logged_in):
+    if not Check_Creds(request.remote_addr,logged_in,"None"):
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
@@ -1256,21 +1269,71 @@ def video_feed():
                 if creds[0] == Username:
                     if creds[1] == Password:
                         logged_in.append([request.remote_addr,creds[2]])
-    if any(request.remote_addr in User for User in logged_in):
+    if Check_Creds(request.remote_addr,logged_in,"None"):
         return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')            
     else:
-        print(0)
         template = {
-            'address': '/',
+            'address': '/video_feed',
         }
         return render_template('login.html', **template) #Renders webpage
-        
+           
+#Renders a webpage fro pure video streaming which is linked to on main page
+@app.route('/command', methods=['GET', 'POST'])
+def table():
+    global logged_in
+    if not Check_Creds(request.remote_addr,logged_in,"None"):
+        if request.form.get('Login') == 'Login':
+            Username = request.form.get('User')
+            Password = request.form.get('Pass')
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'static\\', 'login.csv'), newline='') as login:
+                creds = list(csv.reader(login))
+            for creds in creds:
+                if creds[0] == Username:
+                    if creds[1] == Password:
+                        logged_in.append([request.remote_addr,creds[2]])
+    if Check_Creds(request.remote_addr,logged_in,"None"):
+        # Reads all the current commands in the buffer and addes N/A if blank
+        Next =[] # list of next 4 commands
+        for i in range(0, 4):
+            try: 
+                Next.append(N_CMD.get(block = False)) # reads queue and adds commands to the list.
+            except: 
+                Next.append("N/A") # N/A if it is not available
+        try: 
+            Current = C_CMD.get(block = False) #Reads current command 
+        except: 
+            Current = "N/A"
+       
+        try:
+            temp_val = TEMP_Conn.recv()#random.randint(2400,2600)/100#T_Que.get(block = False)
+        except:
+            temp_val = 0
+
+        #To edit the webpage HTML file with the python data
+        template = {
+            'Current' : Current,
+            'N1' : Next[0], #the next 4 commands
+            'N2' : Next[1],
+            'N3' : Next[2],
+            'N4' : Next[3],
+            'temp': temp_val
+        }
+        return render_template('command.html', **template) #Renders webpage         
+    else:
+        template = {
+            'address': '/command',
+        }
+        return render_template('login.html', **template) #Renders webpage
+
+@app.route('/test')
+def test():
+    return render_template('test.html') #Renders webpage
 
 #New control page
 @app.route('/control', methods=['GET', 'POST'])
 def control_page():
     global logged_in
-    if any(request.remote_addr not in User for User in logged_in):
+    if not Check_Creds(request.remote_addr,logged_in,"None"):
         if request.form.get('Login') == 'Login':
             Username = request.form.get('User')
             Password = request.form.get('Pass')
@@ -1281,34 +1344,59 @@ def control_page():
                     if creds[1] == Password:
                         logged_in.append([request.remote_addr,creds[2]])
 
-    if any(request.remote_addr in User for User in logged_in):
-        if request.method == 'POST':
-                if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
-                    Kill_Conn.send("kill") # Sends kill command on kill pipe
-                    return render_template('control.html')
-                elif request.form.get('Screenshot') == 'Screenshot':
-                    frame = web_frame.get() 
-                    file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_')  + ".jpg"
-                    cv2.imwrite(os.path.join(path, 'screenshots\\', file_name), frame)
-                elif  request.form.get('Pump') == 'Pump':
-                    print("Pump")
-                    CMD_Conn.send("PUMP")
-                    return render_template('control.html')
-                elif  request.form.get('Shutter') == 'Shutter':
-                    print("Shutter")
-                    CMD_Conn.send("Shutter")
-                    return render_template('control.html')
-                else:
-                    pass
-        elif request.method == 'GET':
-            pass
-        return render_template('control.html')          
+    if Check_Creds(request.remote_addr,logged_in,"None"):
+        if Check_Creds(request.remote_addr,logged_in,"operator"):
+            if request.method == 'POST':
+                    if request.form.get('Kill') == 'Kill': # if the form item called Kill is clicked it reads the value
+                        Kill_Conn.send("kill") # Sends kill command on kill pipe
+                        return render_template('control.html')
+                    if request.form.get('Log Out') == 'Log Out':
+                        print("Remove Login")
+                        logged_in.remove([request.remote_addr,Op_mode(request.remote_addr)])
+                        template = {
+                            'address': '/control',
+                        }
+                        return render_template('login.html', **template) #Renders webpage
+                    elif request.form.get('Screenshot') == 'Screenshot':
+                        frame = web_frame.get() 
+                        file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_')  + ".jpg"
+                        cv2.imwrite(os.path.join(path, 'screenshots\\', file_name), frame)
+                    elif  request.form.get('Pump') == 'Pump':
+                        print("Pump")
+                        CMD_Conn.send("PUMP")
+                        return render_template('control.html')
+                    elif  request.form.get('Shutter') == 'Shutter':
+                        print("Shutter")
+                        CMD_Conn.send("Shutter")
+                        return render_template('control.html')
+                    else:
+                        pass
+            elif request.method == 'GET':
+                pass
+            return render_template('control.html') 
+        else:
+            return render_template('Restricted.html')    
     else:
         template = {
-            'address': '/',
+            'address': '/control',
         }
         return render_template('login.html', **template) #Renders webpage
+    
+def Check_Creds(addr, logged_in, level):
+    if level == "None":
+        return any(request.remote_addr in User for User in logged_in)
+    for User in logged_in:
+        if User[0] == addr:
+            if User[1] == level:
+                return True
+    return False
 
+def Op_mode(addr):
+    global logged_in
+    for User in logged_in:
+        if User[0] == addr:
+            return User[1]
+        
 #---------- GUI Thread -------------#
 def GUI():
     global gui, top 
@@ -1320,11 +1408,12 @@ def GUI():
     # gui.mainloop()
 
 #------- Webserver Thread ----------#
-def Server(Q, L, N, K, P):
-    global app, web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn
+def Server(Q, L, N, K, P, T):
+    global app, web_frame, C_CMD, N_CMD, Kill_Conn, CMD_Conn, TEMP_Conn
     web_frame = Q
     C_CMD = L
     N_CMD = N
+    TEMP_Conn = T
     Kill_Conn = K
     CMD_Conn = P
     if __name__ == '__mp_main__':
@@ -1335,11 +1424,11 @@ if __name__ == "__main__":
     Frames = multiprocessing.Queue(5)
     Current_cmd = multiprocessing.Queue(1)
     Next_cmd = multiprocessing.Queue(4)
+    TEMP_rev, TEMP_send = multiprocessing.Pipe(duplex = False)
     Kill_rev, Kill_send = multiprocessing.Pipe(duplex = False)
     CMD_rev, CMD_send = multiprocessing.Pipe(duplex = False)
-    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, CMD_send))
+    server = multiprocessing.Process(target = Server, args=(Frames, Current_cmd, Next_cmd, Kill_send, CMD_send, TEMP_rev))
     server.start()
     GUI()
     server.terminate()
     server.join()
-    
