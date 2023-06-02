@@ -1113,6 +1113,7 @@ def GUI_Server_Comms():
         TEMP_send.send(Comps.Temp.get_last())
     except:
         TEMP_send.send(-1)
+        #this should be a new comment for git 
     #Temp_Que.put(Comps.Temp.get_last())
     gui.after(200,GUI_Server_Comms) # executes it every 200ms 
 
