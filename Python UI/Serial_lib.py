@@ -154,7 +154,8 @@ class Comms:
         n_pk = int(PK[2:4])
         pk_split = PK.split(" ", n_pk)
         operator = MyStr(pk_split[1])
-        out = str(senderID)
+        senderID = str(senderID)
+        out = senderID
 
         if n_pk==1:
             # single package commands
@@ -255,23 +256,22 @@ class Comms:
                         try:
                             match pk_split[idx][0]:
                                 case 'T':
-                                    senType = 'Temperature'
                                     T = float(pk_split[idx+1][1:])
                                     self.Comps.Temp.new_temp(T)
                                     out += "Temp {} °C".format(T)
                                 case 'B':
-                                    senType = 'Bubble'
                                     bub_num = int(pk_split[idx][1])
                                     bub_state = pk_split[idx+1][1:]
                                     self.Comps.Bubble[int(pk_split[idx][1])-1] = pk_split[idx+1][1:]
                                     out += "Bubble {}, state {}".format(bub_num, bub_state)
                                 case 'L':
-                                    senType = 'Liquid Detection'
                                     lds_num = int(pk_split[idx][1])
                                     lds_state = int(pk_split[idx+1][1])
-                                    if lds_state==False:
-                                        print(str(senderID), 'Fill vessel input module ')
-                                        #tk.messagebox.showinfo("ACTTION REQUIRED", "Vessel Empty!\nFill vessel input module {}".format(str(senderID)))
+                                    for pump in self.Comps.pumps:
+                                        print(pump.ID)
+                                        if pump.ID == senderID:
+                                            pump.LDS.state = lds_state
+                                            break
                                     out += " LDS {} state {}".format(lds_num, lds_state)
 
                                 case _:
@@ -362,6 +362,10 @@ class Buffer:
                     elif self.buffer[0][0]=='NOTIF':
                         self.phone.send(self.buffer[0][1])
                         self.POP()
+                        message = tk.messagebox.askquestion('Experiment Over', 'Do you want to wash ?')
+                        if message == 'yes':
+                            print('washing')
+                            WASH(self.Comps)
                         return
                     else:
                         dev, com = [*self.buffer[0]]
@@ -417,6 +421,7 @@ class Buffer:
 
     def NOTIFY(self, text = 'DONE'):
         self.buffer.append(['NOTIF', text])
+        
 
 def Log(command, file_name = "commands.csv"):
     nowTime = datetime.datetime.now()
@@ -464,16 +469,22 @@ def read_detail(filename:str):
     except:
         return ['']*3,['']*3
     
-def WASH(Comps):
-    for i in range(3):
+def WASH(Comps, n=1, volume = 60):
+    for i in range(n):
         #close the shutter, put water solution in the reactor, mix, extract to waste
-        Comps.shutter.close()
-        Comps.pumps[2].pump(20)
-        Comps.mixer.mix(100) 
-        Comps.buffer.BLOCK()
-        Comps.mixer.mix(0)
-        valve_states(Comps.valves, 5)
-        Comps.pumps[3].pump(20)
+        try:
+            Comps.shutter.close()
+            Comps.pumps[3].pump(volume)
+            Comps.mixer.mix() 
+            Comps.buffer.BLOCK(5)
+            Comps.mixer.stop()
+            valve_states(Comps.valves, 0)
+            Comps.pumps[4].pump(-(volume*2))
+            Comps.extract.set_slot(5)
+            Comps.pumps[5].pump((volume*2))
+        except:
+            print('WASHING ERROR')
+            pass
 
 class Cabin():
     """
@@ -549,12 +560,19 @@ class Pump:
     
     def pump(self, volume: float):
         if volume==0.0:
-            return
+            return -1
         else:
-            if self.LDS!=None:
-                self.LDS.poll()
             self.buffer.IN([self.device, "[sID1000 rID{} PK2 P{} m{:.3f}]".format(self.ID, self.num, volume)])
+            return 1
     
+    def poll(self):
+        if self.LDS!=None:
+            self.LDS.poll()
+            return self.LDS.state
+        else: 
+            return 1
+
+
     def set_state(self, state: bool):
         """Param bool state: set False->idle, True->used"""
         self.state = state
@@ -641,25 +659,25 @@ class Mixer:
         self.buffer = buffer
 
     def mix_slow(self):
-        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 80)])
+        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 70)])
     
     def mix(self):
-        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 100)])
+        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 85)])
     
     def mix_fast(self):
-        self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 120)])
+        self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 100)])
 
     def stop(self):
         return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 0)])
 
 class Extract:
-    def __init__(self, device, ID, component_number: int, buffer, n_slots):
+    def __init__(self, device, ID, component_number: int, buffer, n_slots, angle=180):
         self.device = device
         self.ID = ID
         self.num = component_number
         self.buffer = buffer
         self.n_slots = n_slots
-        self.step_angle = 180/(n_slots-1)
+        self.step_angle = angle/(n_slots-1)
         self.current_slot = 0
 
     def set_slot(self, slot):
@@ -700,7 +718,7 @@ class LDS:
         self.device = device
         self.ID = ID
         self.Comms = Comms
-        self.state=True
+        self.state=False
         self.tk = tk
 
     def poll(self):
@@ -798,13 +816,14 @@ class Components:
     
 class Nano:
     state = False
-    def __init__(self, device, ID, port=''):
+    def __init__(self, device, ID, port='', pump = None):
         self.device = device
         self.ID = ID
         self.components = ""
         self.message = ""
         self.port=port
-
+        self.pump = pump
+    
     def get_id(self):
         #print(self.ID)
         return self.ID
