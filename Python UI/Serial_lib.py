@@ -1,12 +1,13 @@
 import serial
+import tkinter as tk
 import serial.tools.list_ports
 import csv, datetime, os, requests, cv2, random, time
 import matplotlib
-matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from matplotlib import style
 from chump import Application
+matplotlib.use("TkAgg")
 
 style.use("ggplot")
 path = os.path.dirname(os.path.realpath(__file__))
@@ -83,6 +84,7 @@ class Comms:
             self.FLUSH_PORT(DEV) 
             return Incoming_Data
         except (NameError,IOError,ValueError):
+            print('error in Serial_Read_Line')
             pass
         return [-1]
 
@@ -152,7 +154,9 @@ class Comms:
         n_pk = int(PK[2:4])
         pk_split = PK.split(" ", n_pk)
         operator = MyStr(pk_split[1])
-        out = str(senderID)
+        senderID = str(senderID)
+        out = senderID
+
         if n_pk==1:
             # single package commands
             match operator:
@@ -182,7 +186,8 @@ class Comms:
 
                 case "VALID": 
                     # temperature commands do not pass through buffer; Do not pop 
-                    if not ('SEN' in self.DECODE_LINE(self.current_command)):
+                    # print(self.current_command)
+                    if not ('R' in self.current_command):
                         command = self.Comps.buffer.POP()
                         Log(self.DECODE_LINE(command))
                     return (out + " VALID")
@@ -251,24 +256,23 @@ class Comms:
                         try:
                             match pk_split[idx][0]:
                                 case 'T':
-                                    senType = 'Temperature'
                                     T = float(pk_split[idx+1][1:])
                                     self.Comps.Temp.new_temp(T)
                                     out += "Temp {} °C".format(T)
                                 case 'B':
-                                    senType = 'Bubble'
                                     bub_num = int(pk_split[idx][1])
                                     bub_state = pk_split[idx+1][1:]
                                     self.Comps.Bubble[int(pk_split[idx][1])-1] = pk_split[idx+1][1:]
                                     out += "Bubble {}, state {}".format(bub_num, bub_state)
                                 case 'L':
-                                    senType = 'Liquid Detection'
                                     lds_num = int(pk_split[idx][1])
                                     lds_state = int(pk_split[idx+1][1])
-                                    self.Comps.LDS[lds_num-1].state = lds_state
-                                    if lds_state==False:
-                                        print('fill vessel input module ', lds_num)
-                                    out += "=LDS {} state {}".format(lds_num, lds_state)
+                                    for pump in self.Comps.pumps:
+                                        print(pump.ID)
+                                        if pump.ID == senderID:
+                                            pump.LDS.state = lds_state
+                                            break
+                                    out += " LDS {} state {}".format(lds_num, lds_state)
 
                                 case _:
                                     pass
@@ -290,6 +294,7 @@ class Comms:
 
     def WRITE(self, DEV, COMMAND):
         self.current_command = COMMAND
+        # print('current com', self.current_command)
         STATE = -1
         TRY = 0
         while(STATE == -1):
@@ -357,6 +362,10 @@ class Buffer:
                     elif self.buffer[0][0]=='NOTIF':
                         self.phone.send(self.buffer[0][1])
                         self.POP()
+                        message = tk.messagebox.askquestion('Experiment Over', 'Do you want to wash ?')
+                        if message == 'yes':
+                            print('washing')
+                            WASH(self.Comps)
                         return
                     else:
                         dev, com = [*self.buffer[0]]
@@ -412,6 +421,7 @@ class Buffer:
 
     def NOTIFY(self, text = 'DONE'):
         self.buffer.append(['NOTIF', text])
+        
 
 def Log(command, file_name = "commands.csv"):
     nowTime = datetime.datetime.now()
@@ -459,16 +469,22 @@ def read_detail(filename:str):
     except:
         return ['']*3,['']*3
     
-def WASH(Comps):
-    for i in range(3):
+def WASH(Comps, n=1, volume = 60):
+    for i in range(n):
         #close the shutter, put water solution in the reactor, mix, extract to waste
-        Comps.shutter.close()
-        Comps.pumps[2].pump(20)
-        Comps.mixer.mix(100) 
-        Comps.buffer.BLOCK()
-        Comps.mixer.mix(0)
-        valve_states(Comps.valves, 5)
-        Comps.pumps[3].pump(20)
+        try:
+            Comps.shutter.close()
+            Comps.pumps[3].pump(volume)
+            Comps.mixer.mix() 
+            Comps.buffer.BLOCK(5)
+            Comps.mixer.stop()
+            valve_states(Comps.valves, 0)
+            Comps.pumps[4].pump(-(volume*2))
+            Comps.extract.set_slot(5)
+            Comps.pumps[5].pump((volume*2))
+        except:
+            print('WASHING ERROR')
+            pass
 
 class Cabin():
     """
@@ -540,18 +556,23 @@ class Pump:
         self.buffer = buffer
         self.num = component_number
         self.state = False
-        self.LDS= LDS
+        self.LDS = LDS
     
     def pump(self, volume: float):
         if volume==0.0:
-            return
+            return -1
         else:
-            if self.LDS!=None:
-                print('polling')
-
-                #self.LDS.poll()
-            self.buffer.IN([self.device, "[sID1000 rID{} PK3 P{} m{:.3f}]".format(self.ID, self.num, volume)])
+            self.buffer.IN([self.device, "[sID1000 rID{} PK2 P{} m{:.3f}]".format(self.ID, self.num, volume)])
+            return 1
     
+    def poll(self):
+        if self.LDS!=None:
+            self.LDS.poll()
+            return self.LDS.state
+        else: 
+            return 1
+
+
     def set_state(self, state: bool):
         """Param bool state: set False->idle, True->used"""
         self.state = state
@@ -637,17 +658,26 @@ class Mixer:
         self.num = component_number
         self.buffer = buffer
 
-    def mix(self, speed: int):
-        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, speed)])
+    def mix_slow(self):
+        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 70)])
+    
+    def mix(self):
+        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 85)])
+    
+    def mix_fast(self):
+        self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 100)])
+
+    def stop(self):
+        return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 0)])
 
 class Extract:
-    def __init__(self, device, ID, component_number: int, buffer, n_slots):
+    def __init__(self, device, ID, component_number: int, buffer, n_slots, angle=180):
         self.device = device
         self.ID = ID
         self.num = component_number
         self.buffer = buffer
         self.n_slots = n_slots
-        self.step_angle = 180/(n_slots-1)
+        self.step_angle = angle/(n_slots-1)
         self.current_slot = 0
 
     def set_slot(self, slot):
@@ -688,22 +718,38 @@ class LDS:
         self.device = device
         self.ID = ID
         self.Comms = Comms
-        self.state=True
+        self.state=False
+        self.tk = tk
 
     def poll(self):
-        self.Comms.WRITE(self.device, "[sID1000 rID{} PK1 R]".format(self.ID))
+        try:
+            self.Comms.WRITE(self.device, "[sID1000 rID{} PK1 R]".format(self.ID))
+        except:
+            pass
+        time.sleep(0.01)
         self.Comms.READ(self.device)
     
     def get_state(self):
         return self.state
-    
+   
 class Temp:
     def __init__(self, device, ID, Comms):
         self.device = device
         self.ID = ID
         self.Comms = Comms
         self.graphs = []
-        self.get_all()
+        # self.get_all()
+        self.xar = []
+        self.yar = []
+
+        now = datetime.datetime.now()
+        current_time = now.strftime("%H_%M_%S")
+        name = 'Temperature' + current_time +'.csv'
+        self.path = os.path.join(path, 'results\\', name)
+        f = open(self.path, 'w')
+        writer = csv.writer(f)
+        writer.writerow(["Time", "temperature"])
+        f.close()
     
     def poll(self):
         try:
@@ -712,29 +758,19 @@ class Temp:
             pass
         time.sleep(0.01)
         self.Comms.READ(self.device)
-
-    def get_all(self):
-        Temp_record = open(os.path.join(path, 'static\\', 'temperature_record.csv'),'r').read()
-        dataArray = Temp_record.split('\n')
-        xar=[]
-        yar=[]
-        for eachLine in dataArray:
-            if len(eachLine)>1:
-                x,y = eachLine.split(',')
-                xar.append(int(x))
-                yar.append(int(y))
-        self.xar = xar
-        self.yar = yar
-        return self.yar
     
-    def new_temp(self, new_temp = 0):
-        Temp_record = open(os.path.join(path, 'static\\', 'temperature_record.csv'),"a")
-        #remove next line later
-        new_temp = random.randint(10,50)
-        Temp_record.write(f"{1},{new_temp}\n")
-        Temp_record.close()
-        self.xar.append(1)
-        self.yar.append(new_temp)
+    def new_temp(self, Temp = 0.0):
+        f = open(self.path, 'a')
+        now = datetime.datetime.now()
+        current_time = now.strftime("%H:%M:%S")
+        try:
+            writer = csv.writer(f)
+            writer.writerow([current_time, Temp])
+        except:
+            pass
+        f.close()
+        self.xar.append(current_time)
+        self.yar.append(Temp)
         self.update_graphs()
 
     def get_last(self):
@@ -780,13 +816,14 @@ class Components:
     
 class Nano:
     state = False
-    def __init__(self, device, ID, port=''):
+    def __init__(self, device, ID, port='', pump = None):
         self.device = device
         self.ID = ID
         self.components = ""
         self.message = ""
         self.port=port
-
+        self.pump = pump
+    
     def get_id(self):
         #print(self.ID)
         return self.ID

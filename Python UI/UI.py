@@ -194,16 +194,16 @@ def init_module(label=None):
     try: Comms.CLOSE_SERIAL_PORT(arduinos)
     except: pass
     Ports = Comms.ID_PORTS_AVAILABLE()
-    arduinos = [0]*6
+    arduinos = [0]*7
     valves = [0]*5
-    pumps = [0]*5
-    LDS = [0]*4
+    pumps = [0]*6
+    LDS = [0]*5
     shutter = 0
     mixer = 0
     extract = 0
     temp = 0
-    ves_in = [0]*3
-    ves_out = [0]*6
+    ves_in = [0]*5
+    ves_out = [0]*7
     ves_main = Vessel(0, "ves_main")
     with open(os.path.join(path,"static\hardware.csv"), "r") as hardware:
         modules_data = hardware.read().split("\n")
@@ -213,7 +213,7 @@ def init_module(label=None):
     for i in range(len(Ports)):
         print("\nSource: ", Ports[i])
         device = Comms.OPEN_SERIAL_PORT(Ports[i])
-        print("\nDevice: ", device)
+        #print("\nDevice: ", device)
         while(device.inWaiting() == 0):
             time.sleep(0.1)
 
@@ -223,44 +223,50 @@ def init_module(label=None):
         print("\narduino: ", deviceID)
         
         if deviceID=="1001":
-            arduinos[0] = Nano(device, deviceID, Ports[i])
-            arduinos[0].add_component("Input Module 1, pump 1")
             ves_in[0] = Vessel()
-            pumps[0] = Pump(device, deviceID, 1, buffer, LDS[0])
             LDS[0]=com.LDS(device, deviceID, Comms)
+            pumps[0] = Pump(device, deviceID, 1, buffer, LDS[0])
+            arduinos[0] = Nano(device, deviceID, Ports[i])
+            arduinos[0].add_component("Input Module 1")
         if deviceID=="1002":
-            arduinos[1] = Nano(device, deviceID, Ports[i])
-            arduinos[1].add_component("Input Module 2, pump 2")
             ves_in[1] = Vessel()
             LDS[1]=com.LDS(device, deviceID, Comms)
-            pumps[1] = Pump(device, deviceID, 2, buffer, LDS[1])
-            
+            pumps[1] = Pump(device, deviceID, 1, buffer, LDS[1]) 
+            arduinos[1] = Nano(device, deviceID, Ports[i])
+            arduinos[1].add_component("Input Module 2")          
         if deviceID=="1003":
-            arduinos[2] = Nano(device, deviceID, Ports[i])
-            arduinos[2].add_component("Input Module 3, pump 3")
             ves_in[2] = Vessel()
             LDS[2]=com.LDS(device, deviceID, Comms)
-            pumps[2] = Pump(device, deviceID, 3, buffer, LDS[2])
+            pumps[2] = Pump(device, deviceID, 1, buffer, LDS[2])
+            arduinos[2] = Nano(device, deviceID, Ports[i])
+            arduinos[2].add_component("Input Module 3")
         if deviceID=="1004":
+            ves_in[3] = Vessel()
+            LDS[3]=com.LDS(device, deviceID, Comms)
+            pumps[3] = Pump(device, deviceID, 1, buffer, LDS[3])
             arduinos[3] = Nano(device, deviceID, Ports[i])
-            arduinos[3].add_component("Ouput Module, pump 4, V1-V5")
+            arduinos[3].add_component("Input Module 4")
+        if deviceID=="1005":
+            arduinos[4] = Nano(device, deviceID, Ports[i])
+            arduinos[4].add_component("Ouput Module")
+            temp=com.Temp(device, deviceID, Comms)
             for i in range(5):
                 valves[i] = Valve(device, deviceID, i+1, buffer)
             for i in range(6):
                 ves_out[i] = Vessel(0, 'Product '+str(i))
             
-            pumps[3] = Pump(device, deviceID, 4, buffer)
-        if deviceID=="1005":
-            arduinos[4] = Nano(device, deviceID, Ports[i])
-            arduinos[4].add_component("Shutter Module")
-            shutter = Shutter(device, deviceID, 1, buffer)
-            mixer = Mixer(device, deviceID, 1, buffer)
-            temp=com.Temp(device, deviceID, Comms)
+            pumps[4] = Pump(device, deviceID, 1, buffer)
+            
         if deviceID=="1006":
             arduinos[5] = Nano(device, deviceID, Ports[i])
-            arduinos[5].add_component("Extraction Module")
+            arduinos[5].add_component("Shutter Module") 
+            shutter = Shutter(device, deviceID, 1, buffer)
+            mixer = Mixer(device, deviceID, 1, buffer)
+        if deviceID=="1007":
             extract = Extract(device, deviceID, 1, buffer, n_slots = 5)
-            pumps[4] = Pump(device, deviceID, 5, buffer)
+            pumps[5] = Pump(device, deviceID, 1, buffer)
+            arduinos[6] = Nano(device, deviceID, Ports[i])
+            arduinos[6].add_component("Extraction Module")
     for i in range(len(arduinos)):
         try:arduinos.remove(0)
         except:pass
@@ -285,7 +291,7 @@ def init_module(label=None):
     if len(arduinos):
         Comps.modules=[]
         for arduino in arduinos:
-            Comps.modules.append("{}: {}\n".format(arduino.get_id(), arduino.get_components()))
+            Comps.modules.append("{}: {}\n".format(arduino.ID, arduino.get_components()))
     else:
         Comps.modules=['no modules found']
 
@@ -362,7 +368,7 @@ class P_Login(ctk.CTk):
                 gui = Main()
                 gui.after(200,task)
                 gui.after(200,GUI_Server_Comms)
-                gui.after(1000, sensor_update)
+                gui.after(2000, sensor_update)
                 gui.mainloop()
             else:
                 tk.messagebox.showerror("Information", "The Username or Password you have entered are incorrect ")
@@ -507,8 +513,9 @@ class P_Init(ctk.CTkFrame):
         details = ctk.CTkLabel(frame1, font=font_XS, text='\n'.join(Comps.modules),justify= 'left')
         details.place(relx = 0.5, rely = 0.5, anchor = 'center') 
 
+        btn1 = btn(frame1, text = 'reset', command=lambda: init_module(details))
         btn2 = btn(frame1, text="Continue", command=lambda: controller.show_frame(P_Home), width = 100, height=30, font = font_S)
-        btn2.place(relx = 0.5, rely = 0.9, anchor = 'center') 
+        place_n([btn1, btn2], rely = 0.9, boundary = (0.3,0.7))
 
         init_module(details)
 
@@ -642,9 +649,11 @@ class P_Test(ctk.CTkFrame):
         btn1.place(relx = 0.5, rely = 0.4, anchor = 'center')
 
         #box 3 mixer
-        _, ent_mix = place_2(0.2, *entry_block(frame3, "speed : "))
-        btn1 = btn(frame3, text="send", command=lambda: Comps.mixer.mix(int(ent_mix.get())))
-        btn1.place(relx = 0.5, rely = 0.35, anchor = 'center')
+        btn0 = btn(frame3, text="slow", command=lambda: Comps.mixer.mix_slow())
+        btn1 = btn(frame3, text="normal", command=lambda: Comps.mixer.mix())
+        btn3 = btn(frame3, text="fast", command=lambda: Comps.mixer.mix_fast())
+        btn2 = btn(frame3, text="stop", command=lambda: Comps.mixer.stop())
+        place_n([btn0, btn1, btn3, btn2], rely = 0.2)
 
         #box 4 extract
         _, ent_ext = place_2(0.2,*entry_block(frame4, "select slot: ", spin=True, from_=1, to=5))
@@ -661,14 +670,16 @@ class P_Auto(ctk.CTkFrame):
         frame2 = Frame(self, fg_color = 'transparent')
         frame2.place(relx= 0.5, rely = 0.55, relwidth=0.45, relheight=0.8, anchor = 'w')
 
-        ent_P = [0]*3
+        ent_P = [0]*4
         _, ent_P[0] = place_2(0.2, *entry_block(frame1, text="Input A (ml)"))
         _, ent_P[1] = place_2(0.3, *entry_block(frame1, text="Input B (ml)"))
         _, ent_P[2] = place_2(0.4, *entry_block(frame1, text="Input C (ml)"))
-        _, ent_I = place_2(0.5, *entry_block(frame1, text="Total dosage (Gy)"))
+        _, ent_P[3] = place_2(0.5, *entry_block(frame1, text="Input D (ml)"))
+        _, ent_I = place_2(0.6, *entry_block(frame1, text="Total dosage (Gy)"))
+
         
-        out_list = ["Input A", "Input B", "Product", "Waste", "Recycle", "Recycle 2"]
-        _, sel_output = place_2(0.6, *entry_block(frame1, text="Select Output", drop_list=out_list))
+        out_list = ["OUTPUT 1", "OUTPUT 2", "OUTPUT 3", "OUTPUT 4", "OUTPUT 5", "RECYCLE", "INPUT 3", "SP", "SP", "SP"]
+        _, sel_output = place_2(0.7, *entry_block(frame1, text="Select Output", drop_list=out_list))
 
         btn1 = btn(frame1, text="Start", width = 100, height=35, command=lambda: experiment(), font=font_S)
         btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
@@ -676,29 +687,63 @@ class P_Auto(ctk.CTkFrame):
         btn2.place(relx = 0.8, rely = 0.8, anchor = 'center')
         #progress bar
         Pbar = ProgressBar(frame2, buffer)
+       
         def experiment():
             tot_vol=0.0
             for i in range(len(ent_P)):
                 try:
                     vol=float(ent_P[i].get())
-                    tot_vol+=vol
+                    if vol!=0.0:
+                        try:
+                            Comps.pumps[i].poll()
+                        except:
+                            tk.messagebox.showerror("Information", "Input module {} is not connected".format(i+1))
+                            print('this module does not exist')
+                            return
+                            
+                        if Comps.pumps[i].LDS.state == False:
+                            # To do : Try 10 times before showing error box 
+                            tk.messagebox.showerror("Action Required", "Please fill The vessel of Input module {}".format(i+1))
+                            return
+                        
+                except:
+                    pass
+            for i in range(len(ent_P)):
+                try:
+                    vol=float(ent_P[i].get())
+                    tot_vol+=vol  
                     Comps.pumps[i].pump(vol)
-                except:pass
-            try:Comps.shutter.open()
+                except:
+                    pass
+            try:
+                Comps.shutter.open()
+                Comps.mixer.mix()
             except:pass
             try:
                 time = Comps.radiate.D2T(float(ent_I.get()))
                 Comps.buffer.BLOCK(time)
             except:pass
-            try:Comps.shutter.close()
+            try:
+                Comps.mixer.stop()
+                Comps.shutter.close() 
             except:pass
 
             try:
-                com.valve_states(Comps.valves, out_list.index(sel_output.get()))
-                Comps.pumps[3].pump(tot_vol+10)
-            except:pass
+                output_index = out_list.index(sel_output.get())
+                if 0<=output_index<=4:
+                    com.valve_states(Comps.valves, 0)
+                    Comps.extract.set_slot(output_index+1)
+                    Comps.pumps[4].pump(-(tot_vol*2+10))
+                    Comps.pumps[5].pump((tot_vol*2+30))
+                else:
+                    com.valve_states(Comps.valves, out_list.index(sel_output.get()))
+                    Comps.pumps[4].pump(-(tot_vol*2+10))
+            except:
+                print('error ouptut')
+                pass
             buffer.NOTIFY('Experiment Over')
             Pbar.SET(buffer.Length())
+            
        
         # buffer list
         textbox = ctk.CTkTextbox(frame2,width=300, height=200, state= 'normal')
@@ -796,9 +841,9 @@ class Scratch():
             state = self.out_list.index(self.Out_widgets[1].get())
             vol = float(self.Out_widgets[3].get())
             com.valve_states(Comps.valves, state)
-            Comps.pumps[3].pump(vol)
+            Comps.pumps[4].pump(-vol)
         elif selected=="Mix":     
-            Comps.mixer.mix(int(self.mix_widgets[1].get()))
+            Comps.mixer.mix()
         elif selected=="Shutter": 
             state = self.out_list.index(self.shutter_widgets[1].get())
             Comps.shutter.set_to(state)
@@ -806,7 +851,7 @@ class Scratch():
             state = int(self.Ext_widgets[1].get())
             vol = float(self.Ext_widgets[3].get())
             Comps.extract.set_slot(state)
-            Comps.pumps[4].pump(vol)
+            Comps.pumps[5].pump(vol)
         elif selected=="System":  
             time = float(self.system_widgets[1].get())
             Comps.buffer.BLOCK(time)
@@ -945,12 +990,19 @@ class P_Iter(ctk.CTkFrame):
             count = int(ent_count.get())
 
             for i in range(count):
+                vol=0
                 if Ra!="" and Ra_step!="":
-                    Comps.pumps[0].pump(float(Ra) + float(Ra_step)*i)
+                    vola = float(Ra) + float(Ra_step)*i
+                    vol += vola
+                    Comps.pumps[0].pump(vola)
                 if Rb!="" and Rb_step!="":
-                    Comps.pumps[1].pump(float(Rb) + float(Rb_step)*i)
+                    volb = float(Rb) + float(Rb_step)*i
+                    vol += volb
+                    Comps.pumps[1].pump(volb)
                 if Rc!="" and Rc_step!="":
-                    Comps.pumps[2].pump(float(Rc) + float(Rc_step)*i)
+                    volc = float(Rc) + float(Rc_step)*i
+                    vol += volc
+                    Comps.pumps[2].pump(volc)
                 if dosage!="" and dosage_step!="":
                     try:
                         Comps.shutter.open()
@@ -960,7 +1012,7 @@ class P_Iter(ctk.CTkFrame):
                     except:pass
                 try:
                     com.valve_states(Comps.valves, 3)
-                    Comps.pumps[3].pump(10)
+                    Comps.pumps[4].pump(-(vol+10))
                 except:pass
 
             Pbar.SET(buffer.Length())
@@ -1069,10 +1121,11 @@ def sensor_update():
     #update temperature sensor
     try:
         if Comps.arduinos[0].state == False:
-            Comps.Temp.poll()   
+            Comps.Temp.poll() 
+            pass  
     except:
         pass
-    gui.after(1000, sensor_update)
+    gui.after(2000, sensor_update)
     time.sleep(0.01)
 
 #---------- Webpage Commands ---------------#
@@ -1379,4 +1432,3 @@ if __name__ == "__main__":
     GUI()
     server.terminate()
     server.join()
-    
