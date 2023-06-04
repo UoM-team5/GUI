@@ -1357,17 +1357,22 @@ def control_page():
                             'address': '/control',
                         }
                         return render_template('login.html', **template) #Renders webpage
-                    elif request.form.get('Screenshot') == 'Screenshot':
+                    elif request.form.get('Capture') == 'Capture':
                         frame = web_frame.get() 
                         file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_')  + ".jpg"
-                        cv2.imwrite(os.path.join(path, 'screenshots\\', file_name), frame)
-                    elif  request.form.get('Pump') == 'Pump':
-                        print("Pump")
-                        CMD_Conn.send("PUMP")
+                        cv2.imwrite(os.path.join(path, 'Captures\\', file_name), frame)
+                    elif  request.form.get('Start') == 'Start':
+                        print(request.form.get('Output'))
+                        print(request.form.get('RA_mls'))
+                        print(request.form.get('RB_mls'))
+                        print(request.form.get('RC_mls'))
+                        print(request.form.get('RD_mls'))
+                        print(request.form.get('Dosage'))
+                        #CMD_Conn.send("PUMP")
                         return render_template('control.html')
-                    elif  request.form.get('Shutter') == 'Shutter':
-                        print("Shutter")
-                        CMD_Conn.send("Shutter")
+                    elif  request.form.get('Wash') == 'Wash':
+                        print("Wash")
+                        CMD_Conn.send("Wash")
                         return render_template('control.html')
                     else:
                         pass

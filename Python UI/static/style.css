@@ -40,6 +40,7 @@ Monitor {
 	height: 500px;
 }
 
+
 section {
 	width: 100%;
 	height: 50%
@@ -177,6 +178,25 @@ tr:nth-child(even) {
 }
 
 .buttonL:hover {
+	background-color: #0008ff;
+	color: white;
+}
+
+.button_Action {
+	background-color: #65656530;
+	border: 1px solid #0008ff;
+	color: #0008ff;
+	padding: 16px ;
+	text-align: center;
+	text-decoration: none;
+	display: inline-block;
+	font-size: 16px;
+	margin: 4px 2px;
+	transition-duration: 0.4s;
+	cursor: pointer;
+}
+
+.buttonA:hover {
 	background-color: #0008ff;
 	color: white;
 }
