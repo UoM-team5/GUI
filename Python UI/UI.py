@@ -1171,10 +1171,10 @@ def Main_page():
                         'address': '/',
                     }
                     return render_template('login.html', **template) #Renders webpage
-                elif request.form.get('Screenshot') == 'Screenshot':
+                elif request.form.get('Capture') == 'Capture':
                     frame = web_frame.get()
                     file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_') + ".jpg"
-                    cv2.imwrite(os.path.join(path, 'screenshots\\', file_name), frame)
+                    cv2.imwrite(os.path.join(path, 'Captures\\', file_name), frame)
                 else:
                     pass
         elif request.method == 'GET':

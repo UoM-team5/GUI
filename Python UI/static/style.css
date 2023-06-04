@@ -114,6 +114,25 @@ tr:nth-child(even) {
 	color: white;
 }
 
+.button_Capture{
+	background-color: #65656530;
+	border: 1px solid #b700ff;
+	color: #b700ff;
+	padding: 16px ;
+	text-align: center;
+	text-decoration: none;
+	display: inline-block;
+	font-size: 16px;
+	margin: 4px 2px;
+	transition-duration: 0.4s;
+	cursor: pointer;
+}
+
+.buttonCap:hover {
+	background-color: #b700ff;
+	color: white;
+}
+
 .button_Home {
 	background-color: #65656530;
 	border: 1px solid #ff6f00;
