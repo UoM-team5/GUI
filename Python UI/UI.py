@@ -1148,16 +1148,83 @@ def GUI_Server_Comms():
             gui.Quit_application() # Quits all applications
     if rem_control.get() and CMD_rev.poll(timeout=0.001): # polls the kill pipeline for new commands
         command = CMD_rev.recv()
-        if command == "PUMP": # if the command is kill
-            print("this is a Pump command")
+        if command == "Wash": # if the command is kill
+            print("this is a Wash command")
+            com.WASH(Comps,2,20)
+        else:
+            print("This is a process command")
             try:
-                Comps.pumps[0].pump(5)
-            except:
-                pass
-        if command == "Shutter":
-            print("This is a shutter command")
-            try:
-                Comps.shutter.open()
+                Out, A, B, C, D, Dose = command.split(',')
+                Out = int(str(Out).replace("OUTPUT_",""))-1
+                print(A)
+                print(B)
+                print(C)
+                print(D)
+                print(Dose)
+                print(Out)
+
+                ent_P = []
+                ent_P.append(float(A))
+                ent_P.append(float(B))
+                ent_P.append(float(C))
+                ent_P.append(float(D))
+                print(ent_P[0])
+                print(ent_P[1])
+                print(ent_P[2])
+                print(ent_P[3])
+                tot_vol=0.0
+                for i in range(len(ent_P)):
+                    try:
+                        vol=ent_P[i]
+                        if vol!=0.0:
+                            try:
+                                Comps.pumps[i].poll()
+                            except:
+                                print('this module does not exist')
+                                break
+                                
+                            if Comps.pumps[i].LDS.state == False:
+                                # To do : Try 10 times before showing error box 
+                                print("Please fill The vessel of Input module {}".format(i+1))
+                                break
+                            
+                    except:
+                        pass
+                for i in range(len(ent_P)):
+                    try:
+                        vol=ent_P[i]
+                        tot_vol+=vol  
+                        Comps.pumps[i].pump(vol)
+                    except:
+                        pass
+                try:
+                    Comps.shutter.open()
+                    Comps.mixer.mix()
+                except:pass
+                try:
+                    time = Comps.radiate.D2T(float(Dose))
+                    Comps.buffer.BLOCK(time)
+                except:pass
+                try:
+                    Comps.mixer.stop()
+                    Comps.shutter.close() 
+                except:pass
+
+                try:
+                    output_index = Out
+                    if 0<=output_index<=4:
+                        com.valve_states(Comps.valves, 0)
+                        Comps.extract.set_slot(output_index+1)
+                        Comps.pumps[4].pump(-(tot_vol*2+10))
+                        Comps.pumps[5].pump((tot_vol*2+30))
+                    else:
+                        com.valve_states(Comps.valves, Out)
+                        Comps.pumps[4].pump(-(tot_vol*2+10))
+                except:
+                    print('error ouptut')
+                    pass
+                buffer.NOTIFY('Experiment Over')
+                print("done")
             except:
                 pass
     elif CMD_rev.poll(timeout=0.001):
@@ -1224,10 +1291,10 @@ def Main_page():
                         'address': '/',
                     }
                     return render_template('login.html', **template) #Renders webpage
-                elif request.form.get('Screenshot') == 'Screenshot':
+                elif request.form.get('Capture') == 'Capture':
                     frame = web_frame.get()
                     file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_') + ".jpg"
-                    cv2.imwrite(os.path.join(path, 'screenshots\\', file_name), frame)
+                    cv2.imwrite(os.path.join(path, 'Captures\\', file_name), frame)
                 else:
                     pass
         elif request.method == 'GET':
@@ -1357,17 +1424,19 @@ def control_page():
                             'address': '/control',
                         }
                         return render_template('login.html', **template) #Renders webpage
-                    elif request.form.get('Screenshot') == 'Screenshot':
+                    elif request.form.get('Capture') == 'Capture':
                         frame = web_frame.get() 
                         file_name = str(datetime.datetime.now()).replace('.','_').replace('-','_').replace(':','_')  + ".jpg"
-                        cv2.imwrite(os.path.join(path, 'screenshots\\', file_name), frame)
-                    elif  request.form.get('Pump') == 'Pump':
-                        print("Pump")
-                        CMD_Conn.send("PUMP")
+                        cv2.imwrite(os.path.join(path, 'Captures\\', file_name), frame)
+                    elif  request.form.get('Start') == 'Start':
+                        Command = (str(request.form.get('Output')) + "," + str(request.form.get('RA_mls')) + "," + str(request.form.get('RB_mls')) 
+                                    + "," + str(request.form.get('RC_mls')) + "," + str(request.form.get('RD_mls')) + "," + str(request.form.get('Dosage')))
+                        CMD_Conn.send(Command)
+                        #CMD_Conn.send("PUMP")
                         return render_template('control.html')
-                    elif  request.form.get('Shutter') == 'Shutter':
-                        print("Shutter")
-                        CMD_Conn.send("Shutter")
+                    elif  request.form.get('Wash') == 'Wash':
+                        print("Wash")
+                        CMD_Conn.send("Wash")
                         return render_template('control.html')
                     else:
                         pass

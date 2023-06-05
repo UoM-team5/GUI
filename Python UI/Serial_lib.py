@@ -774,7 +774,7 @@ class Temp:
         self.update_graphs()
 
     def get_last(self):
-        print(self.yar[-1])
+        # print(self.yar[-1])
         return self.yar[-1]
     
     def new_graph(self, graph):
