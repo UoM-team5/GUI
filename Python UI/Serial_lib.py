@@ -267,11 +267,14 @@ class Comms:
                                 case 'L':
                                     lds_num = int(pk_split[idx][1])
                                     lds_state = int(pk_split[idx+1][1])
+                                    
                                     for pump in self.Comps.pumps:
-                                        print(pump.ID)
-                                        if pump.ID == senderID:
-                                            pump.LDS.state = lds_state
-                                            break
+                                        try:
+                                            if pump.ID == senderID:
+                                                pump.LDS.state = lds_state
+                                                break
+                                        except:
+                                            pass
                                     out += " LDS {} state {}".format(lds_num, lds_state)
 
                                 case _:
@@ -321,6 +324,7 @@ class Comms:
     def FLUSH_PORT(self, DEV):
         try:
             for i in range(len(DEV)):
+                print('flushed input')
                 DEV[i].flushInput()
         except:
             pass
@@ -362,10 +366,6 @@ class Buffer:
                     elif self.buffer[0][0]=='NOTIF':
                         self.phone.send(self.buffer[0][1])
                         self.POP()
-                        message = tk.messagebox.askquestion('Experiment Over', 'Do you want to wash ?')
-                        if message == 'yes':
-                            print('washing')
-                            WASH(self.Comps)
                         return
                     else:
                         dev, com = [*self.buffer[0]]
@@ -378,6 +378,9 @@ class Buffer:
                         print('Unblocked')
                         self.blocked=False
                         self.POP()
+
+                        Comms.READ(self.Comps.Temp.device)
+                        print('flushed input')
         except:
             pass
             
@@ -422,7 +425,6 @@ class Buffer:
     def NOTIFY(self, text = 'DONE'):
         self.buffer.append(['NOTIF', text])
         
-
 def Log(command, file_name = "commands.csv"):
     nowTime = datetime.datetime.now()
     time = nowTime.strftime("%H:%M:%S")
@@ -469,13 +471,13 @@ def read_detail(filename:str):
     except:
         return ['']*3,['']*3
     
-def WASH(Comps, n=1, volume = 60):
+def WASH(Comps, n=1, volume = 30):
     for i in range(n):
         #close the shutter, put water solution in the reactor, mix, extract to waste
         try:
             Comps.shutter.close()
+            Comps.mixer.mix_slow() 
             Comps.pumps[3].pump(volume)
-            Comps.mixer.mix() 
             Comps.buffer.BLOCK(5)
             Comps.mixer.stop()
             valve_states(Comps.valves, 0)
@@ -618,11 +620,12 @@ def valve_states(Valves, out: int):
             print("error unknown valve state")
             return
     for idx in range(0, len(states)):
-        match int(states[idx]):
-            case 0: Valves[idx].close()
-            case 1: Valves[idx].open()
-            case 2: Valves[idx].mid()
-            case _: pass
+        for i in range(2):
+            match int(states[idx]):
+                case 0: Valves[idx].close()
+                case 1: Valves[idx].open()
+                case 2: Valves[idx].mid()
+                case _: pass
 
 class Shutter:
     def __init__(self, device, ID, component_number: int, buffer):
@@ -738,10 +741,11 @@ class Temp:
         self.ID = ID
         self.Comms = Comms
         self.graphs = []
+        self.labels = []
         # self.get_all()
         self.xar = []
         self.yar = []
-
+        self.blocked = True
         now = datetime.datetime.now()
         current_time = now.strftime("%H_%M_%S")
         name = 'Temperature' + current_time +'.csv'
@@ -752,13 +756,14 @@ class Temp:
         f.close()
     
     def poll(self):
+        
         try:
             self.Comms.WRITE(self.device, "[sID1000 rID{} PK1 R]".format(self.ID))
         except:
             pass
         time.sleep(0.01)
-        self.Comms.READ(self.device)
-    
+
+   
     def new_temp(self, Temp = 0.0):
         f = open(self.path, 'a')
         now = datetime.datetime.now()
@@ -772,11 +777,22 @@ class Temp:
         self.xar.append(current_time)
         self.yar.append(Temp)
         self.update_graphs()
+        self.update_labels()
 
     def get_last(self):
         # print(self.yar[-1])
         return self.yar[-1]
     
+    def new_label(self, label):
+        self.labels.append(label)
+
+    def update_labels(self):
+        for label in self.labels:
+            try:
+                label.configure(text='T = {} °C'.format(self.yar[-1]), font = ("Consolas", 18, "normal"))
+            except:
+                print('label not updated')
+
     def new_graph(self, graph):
         # Add new graph object instance to list of graphs
         self.graphs.append(graph)

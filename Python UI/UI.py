@@ -21,7 +21,7 @@ font_L = ("Consolas", 30, "normal")
 def set_mode(i: int):
     if i==0: ctk.set_appearance_mode("light")
     if i==1: ctk.set_appearance_mode("dark")
-set_mode(1)
+set_mode(0)
 ctk.set_default_color_theme("dark-blue")
 path = os.path.dirname(os.path.realpath(__file__))
 class ProgressBar():
@@ -83,7 +83,7 @@ def btn(frame, text: str, command=None, width=50, height=20, font=font_XS):
                         command = command)
     return btn
 
-def btn_img(frame, text: str,  file_name: str, command=None, Xresize = 30, Yresize = 30):
+def btn_img(frame, text: str,  file_name: str, command=None, Xresize = 30, Yresize = 30, font = font_M):
     try:
         photo = ctk.CTkImage(Image.open(os.path.join(path,'static\\', 'images\\', file_name), "r"), size = (Xresize,Yresize))
     except:
@@ -91,12 +91,13 @@ def btn_img(frame, text: str,  file_name: str, command=None, Xresize = 30, Yresi
     btn = ctk.CTkButton(frame, 
                         text=text, 
                         image = photo,
+                        font=font,
                         #fg_color='darkgrey',
                         #hover_color='darkblue', 
                         #border_width=1,
                         #border_color='black',
                         corner_radius=10, 
-                        width=150, height=40,
+                        width=200, height=40,
                         command = command,
                         compound = 'left')
     btn.image = photo
@@ -306,6 +307,7 @@ class Frame(ctk.CTkFrame):
         self.label = ctk.CTkLabel(self, text=text)
         self.label.grid(row=0, column=0, padx=20)
 
+
 class P_Login(ctk.CTk):
     def __init__(self, *args, **kwargs):
         ctk.CTk.__init__(self, *args, **kwargs)
@@ -367,8 +369,8 @@ class P_Login(ctk.CTk):
                 top.destroy()
                 gui = Main()
                 gui.after(200,task)
-                gui.after(200,GUI_Server_Comms)
-                gui.after(2000, sensor_update)
+                # gui.after(500,GUI_Server_Comms)
+                gui.after(1000, sensor_update)
                 gui.mainloop()
             else:
                 tk.messagebox.showerror("Information", "The Username or Password you have entered are incorrect ")
@@ -426,14 +428,14 @@ class MenuBar(tk.Menu):
         self.configure(background= 'blue', fg='red')
 
         self.add_command(label="Home", command=lambda: parent.show_frame(P_Home))
-        self.add_command(label="Control", command=lambda: parent.show_frame(P_Auto))
+        self.add_command(label="Auto", command=lambda: parent.show_frame(P_Auto))
+        self.add_command(label="Manual", command=lambda: parent.show_frame(P_Code))
         self.add_command(label="Iterative", command=lambda: parent.show_frame(P_Iter))
-        self.add_command(label="LEGO", command=lambda: parent.show_frame(P_Code))
 
         menu_help = tk.Menu(self, tearoff=0)
         self.add_cascade(label="More", menu=menu_help)
         menu_help.add_command(label="Parameter",font=('Arial',11), command=lambda: parent.show_frame(P_Param))
-        menu_help.add_command(label="Temperature",font=('Arial',11), command=lambda: parent.show_frame(P_Monit))
+        menu_help.add_command(label="Unit Test",font=('Arial',11), command=lambda: parent.show_frame(P_Test))
 
 class Main(ctk.CTk):
     def __init__(self, *args, **kwargs):
@@ -524,15 +526,15 @@ class P_Home(ctk.CTkFrame):
         ctk.CTkFrame.__init__(self, parent)
         add_image(self, "arcadius.png", relx=0.5, rely=0.05, size=(300,60), anchor = 'n')
 
-        btn1=btn_img(self, "Automate", "auto.png", command=lambda: controller.show_frame(P_Auto))
+        btn1=btn_img(self, "Automatic", "auto.png", command=lambda: controller.show_frame(P_Auto))
         btn2=btn_img(self, "Iterate", "iter.png", command=lambda: controller.show_frame(P_Iter))
-        btn3=btn_img(self, "LEGO", "code.png", command=lambda: controller.show_frame(P_Code))
-        place_n([btn1, btn2, btn3], 0.4, (0.2, 0.8))
+        btn3=btn_img(self, "Manual", "code.png", command=lambda: controller.show_frame(P_Code))
+        place_n([btn1, btn3, btn2], 0.4)
 
-        btn1=btn_img(self, "Manual", "manual.png", command=lambda: controller.show_frame(P_Test))
-        btn2=btn_img(self, "Task", "book.png", command=lambda: controller.show_frame(P_Hist))
-        btn3=btn_img(self, "Parameters", "param.png", command=lambda: controller.show_frame(P_Param))
-        place_n([btn1, btn2, btn3], 0.6, (0.2,0.8))
+        btn1=btn_img(self, "Monitor", "manual.png", command=lambda: controller.show_frame(P_Monit))
+        btn2=btn_img(self, "History", "book.png", command=lambda: controller.show_frame(P_Hist))
+        btn3=btn_img(self, "Param", "param.png", command=lambda: controller.show_frame(P_Param))
+        place_n([btn1, btn2, btn3], 0.6)
 
         btn_exit = btn(self, text="Exit", command=lambda: controller.Quit_application())
         btn_exit.place(relx = 0.5, rely = 0.8, anchor = 'center')
@@ -610,7 +612,7 @@ class P_Param(ctk.CTkFrame):
 class P_Test(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)
-        title = ctk.CTkLabel(self, text = "Manual Control", font=font_L)
+        title = ctk.CTkLabel(self, text = "Manual", font=font_L)
         title.place(relx = 0.5, rely = 0.05, anchor = 'center')
         
         frame1 = Frame(self, text = "Valve")
@@ -662,7 +664,7 @@ class P_Test(ctk.CTkFrame):
 class P_Auto(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)
-        title = ctk.CTkLabel(self, text = "Automated MVP", font=font_L)
+        title = ctk.CTkLabel(self, text = "Automatic", font=font_L)
         title.place(relx = 0.5, rely = 0.1, anchor = 'center')
 
         frame1 = Frame(self)
@@ -671,43 +673,59 @@ class P_Auto(ctk.CTkFrame):
         frame2.place(relx= 0.5, rely = 0.55, relwidth=0.45, relheight=0.8, anchor = 'w')
 
         ent_P = [0]*4
-        _, ent_P[0] = place_2(0.2, *entry_block(frame1, text="Input A (ml)"))
-        _, ent_P[1] = place_2(0.3, *entry_block(frame1, text="Input B (ml)"))
-        _, ent_P[2] = place_2(0.4, *entry_block(frame1, text="Input C (ml)"))
-        _, ent_P[3] = place_2(0.5, *entry_block(frame1, text="Input D (ml)"))
+        _, ent_P[0] = place_2(0.2, *entry_block(frame1, text="Input 1 (ml)"))
+        _, ent_P[1] = place_2(0.3, *entry_block(frame1, text="Input 2 (ml)"))
+        _, ent_P[2] = place_2(0.4, *entry_block(frame1, text="Input 3 (ml)"))
+        _, ent_P[3] = place_2(0.5, *entry_block(frame1, text="Input 4 (ml)"))
         _, ent_I = place_2(0.6, *entry_block(frame1, text="Total dosage (Gy)"))
 
         
-        out_list = ["OUTPUT 1", "OUTPUT 2", "OUTPUT 3", "OUTPUT 4", "OUTPUT 5", "RECYCLE", "INPUT 3", "SP", "SP", "SP"]
+        out_list = ["OUTPUT 1", "OUTPUT 2", "OUTPUT 3", "OUTPUT 4", "OUTPUT 5", "RECYCLE", "INPUT 3", "SPARE", "SPARE", "SPARE"]
         _, sel_output = place_2(0.7, *entry_block(frame1, text="Select Output", drop_list=out_list))
 
         btn1 = btn(frame1, text="Start", width = 100, height=35, command=lambda: experiment(), font=font_S)
         btn1.place(relx = 0.5, rely = 0.8, anchor = 'center')
         btn2 = btn(frame1, text="Wash", command=lambda: com.WASH(Comps)) 
         btn2.place(relx = 0.8, rely = 0.8, anchor = 'center')
+        # temperature
+        self.temperature_label = ctk.CTkLabel(self, text='')
+        self.temperature_label.place(relx = 0.9, rely = 0.1, anchor = 'center')
+        try:
+            Comps.Temp.new_label(self.temperature_label)
+        except:
+            pass
         #progress bar
         Pbar = ProgressBar(frame2, buffer)
-       
+
+        def user_input_check(entry_Pump, module_number):
+            """
+            checks the user input for pumping liquids from input modules
+            returns True if input can be executed
+            Flase otherwise
+            """
+            try:
+                volume=float(entry_Pump.get())
+                if volume!=0.0:
+                    # com.Input_Ready(Comps) make the folloing into a funcion
+                    try:
+                        Comps.pumps[module_number].poll()
+                        print('pump {}, state LDS {}'.format(module_number, Comps.pumps[module_number].LDS.state))
+                        if Comps.pumps[module_number].LDS.state == False:
+                            # To do : Try 10 times before showing error box 
+                            tk.messagebox.showerror("Action Required", "Please fill The vessel of Input module {}".format(module_number+1))
+                            return False
+                    except:
+                        tk.messagebox.showerror("Information", "Input module {} is not connected".format(module_number+1))
+                        print('this module does not exist')
+                        return False
+                    return True
+            except:
+                return True
         def experiment():
             tot_vol=0.0
             for i in range(len(ent_P)):
-                try:
-                    vol=float(ent_P[i].get())
-                    if vol!=0.0:
-                        try:
-                            Comps.pumps[i].poll()
-                        except:
-                            tk.messagebox.showerror("Information", "Input module {} is not connected".format(i+1))
-                            print('this module does not exist')
-                            return
-                            
-                        if Comps.pumps[i].LDS.state == False:
-                            # To do : Try 10 times before showing error box 
-                            tk.messagebox.showerror("Action Required", "Please fill The vessel of Input module {}".format(i+1))
-                            return
-                        
-                except:
-                    pass
+                if not user_input_check(ent_P[i], i):
+                    return
             for i in range(len(ent_P)):
                 try:
                     vol=float(ent_P[i].get())
@@ -734,9 +752,9 @@ class P_Auto(ctk.CTkFrame):
                     com.valve_states(Comps.valves, 0)
                     Comps.extract.set_slot(output_index+1)
                     Comps.pumps[4].pump(-(tot_vol*2+10))
-                    Comps.pumps[5].pump((tot_vol*2+30))
+                    Comps.pumps[5].pump((tot_vol*2+20))
                 else:
-                    com.valve_states(Comps.valves, out_list.index(sel_output.get()))
+                    com.valve_states(Comps.valves, out_list.index(sel_output.get())-4)
                     Comps.pumps[4].pump(-(tot_vol*2+10))
             except:
                 print('error ouptut')
@@ -774,7 +792,7 @@ class Scratch():
     def __init__(self, frame, rely):
         self.rely = rely
         
-        module_list = ["Input", "Output", "Mix", "Shutter", "Extract", "System"]
+        module_list = ["Input", "Output", "Mix", "Shutter", "Extract", "Delay"]
         _, combo = place_2(rely,*entry_block(frame, text="", drop_list=module_list),0.1)
         combo.configure(command=self.combo_select)
         self.combo=combo
@@ -793,8 +811,10 @@ class Scratch():
         Out_widgets[0], Out_widgets[1] = entry_block(frame, text="Select Output", drop_list=self.out_list)
         Out_widgets[2], Out_widgets[3] = entry_block(frame, "Volume (ml)")
         
+        # make drop down slow, mid , fast, and Delay (s)
         mix_widgets[0], mix_widgets[1] = entry_block(frame, text="Speed")
         
+        # add delay (s)
         shutter_list = ["Open", "close", "mid"]
         shutter_widgets[0], shutter_widgets[1] = entry_block(frame, text="mode", drop_list=shutter_list)
         
@@ -809,7 +829,7 @@ class Scratch():
         self.shutter_widgets = shutter_widgets
         self.Ext_widgets = Ext_widgets
         self.system_widgets = system_widgets
-        self.all_widgets = In_widgets+Out_widgets+mix_widgets+shutter_widgets+system_widgets
+        self.all_widgets = In_widgets+Out_widgets+mix_widgets+Ext_widgets+shutter_widgets+system_widgets
         self.combo_select(combo.get())
 
         self.current_widgets=self.In_widgets
@@ -824,8 +844,8 @@ class Scratch():
         elif selected=="Output":  current_widgets = self.Out_widgets
         elif selected=="Mix":     current_widgets = self.mix_widgets
         elif selected=="Shutter": current_widgets = self.shutter_widgets
-        elif selected=="Extract": current_widgets = self.Out_widgets
-        elif selected=="System":  current_widgets = self.system_widgets
+        elif selected=="Extract": current_widgets = self.Ext_widgets
+        elif selected=="Delay":  current_widgets = self.system_widgets
         
         self.current_widgets = current_widgets
         place_n(self.current_widgets, rely=self.rely, boundary=(0.2,1))
@@ -852,7 +872,7 @@ class Scratch():
             vol = float(self.Ext_widgets[3].get())
             Comps.extract.set_slot(state)
             Comps.pumps[5].pump(vol)
-        elif selected=="System":  
+        elif selected=="Delay":  
             time = float(self.system_widgets[1].get())
             Comps.buffer.BLOCK(time)
     
@@ -868,13 +888,11 @@ class Scratch():
 class P_Code(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)
-        title = ctk.CTkLabel(self, text = "Modular", font=font_L)
+        title = ctk.CTkLabel(self, text = "Manual", font=font_L)
         title.place(relx = 0.5, rely = 0.1, anchor = 'center')
 
         frame1 = Frame(self)
         frame1.place(relx= 0.6, rely = 0.55, relwidth=0.55, relheight=0.8, anchor = 'e')
-        # frame1 = ctk.CTkScrollableFrame(self, width=500, height=800)
-        # frame1.place(relx= 0.6, rely = 0.55, relwidth=0.55, relheight=0.8, anchor = 'e')
         frame2 = Frame(self, fg_color = 'transparent')
         frame2.place(relx= 0.6, rely = 0.55, relwidth=0.4, relheight=0.8, anchor = 'w')
         scratch_rows = [Scratch(frame1, 1/15)]
@@ -886,7 +904,7 @@ class P_Code(ctk.CTkFrame):
         def start_experiment():
             for scratch_row in scratch_rows:
                 scratch_row.send_command()
-            Pbar.SET(buffer.Left())
+            Pbar.SET(buffer.Length())
         def delete_row():
             scratch_rows.pop(-1).delete()
 
@@ -915,7 +933,7 @@ class P_Code(ctk.CTkFrame):
         def update_cam():
             try:
                 if (controller.visible_frame==P_Code):
-                    controller.get_cam_frame(label, resize = 0.3)
+                    controller.get_cam_frame(label, resize = 0.6)
             except:
                 pass
             label.after(50, update_cam)
@@ -1088,18 +1106,14 @@ class P_Monit(ctk.CTkFrame):
             Comps.Temp.new_graph(com.Graph(frame))
         except:
             pass
-        new_data = btn(self, text="update",command=lambda: Comps.Temp.poll())
-        new_data.place(relx = 0.8, rely = 0, anchor = 'n')
 
 def task():
-    global Comps
     # Communication
     # send command out of buffer
     buffer.OUT()
     # get response from current device
     Comms.READ(buffer.current_device)
     
-    #To simulate getting commands this will be replaced with actual ones
     #------- start ----------#
     temp_list = buffer.READ()
     #for i in range(0,10):
@@ -1120,13 +1134,20 @@ def task():
 def sensor_update():
     #update temperature sensor
     try:
-        if Comps.arduinos[0].state == False:
+        if Comps.arduinos[0].state == False:# and Comps.buffer.blocked:
+            Comps.arduinos[0].busy()
             Comps.Temp.poll() 
-            pass  
+            buffer.current_device = Comps.Temp.device
+            
     except:
         pass
-    gui.after(2000, sensor_update)
+    try:
+        TEMP_send.send(Comps.Temp.get_last())
+    except:
+        TEMP_send.send(-1)
+    gui.after(1000, sensor_update)
     time.sleep(0.01)
+
 
 #---------- Webpage Commands ---------------#
 
@@ -1162,13 +1183,13 @@ def GUI_Server_Comms():
                 pass
     elif CMD_rev.poll(timeout=0.001):
         CMD_rev.recv()
-    try:
-        TEMP_send.send(Comps.Temp.get_last())
-    except:
-        TEMP_send.send(-1)
+    # try:
+    #     TEMP_send.send(Comps.Temp.get_last())
+    # except:
+    #     TEMP_send.send(-1)
         #this should be a new comment for git 
     #Temp_Que.put(Comps.Temp.get_last())
-    gui.after(200,GUI_Server_Comms) # executes it every 200ms 
+    gui.after(500,GUI_Server_Comms) # executes it every 200ms 
 
 app = Flask(__name__) #main web application
 
@@ -1402,10 +1423,6 @@ def GUI():
     global gui, top 
     top = P_Login()
     top.mainloop()
-    # gui = Main()
-    # gui.after(100,task)
-    # gui.after(200,GUI_Server_Comms)
-    # gui.mainloop()
 
 #------- Webserver Thread ----------#
 def Server(Q, L, N, K, P, T):
