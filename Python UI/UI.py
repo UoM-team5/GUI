@@ -1239,7 +1239,7 @@ def GUI_Server_Comms():
                         Comps.pumps[4].pump(-(tot_vol*2+10))
                         Comps.pumps[5].pump((tot_vol*2+30))
                     else:
-                        com.valve_states(Comps.valves, Out)
+                        com.valve_states(Comps.valves, Out-4)
                         Comps.pumps[4].pump(-(tot_vol*2+10))
                 except:
                     print('error ouptut')
@@ -1520,5 +1520,3 @@ if __name__ == "__main__":
     server.join()
 
 
-
-#comment for commit
