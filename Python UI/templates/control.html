@@ -18,17 +18,50 @@
 			</h1>
 			<img id="stream" src="{{ url_for('video_feed') }}" alt="view" style="width: auto; height:70%;">
 			<form method="post" action="/control">
-				<input type="submit" value="Screenshot" name="Screenshot" />
+				<input type="submit" value="Capture" name="Capture" class="button_Capture buttonCap" />
 			</form>
 		</Image_stream>
 		<Control_section>
-			<h2 style="align-content: center;">
+			<h1 style="margin: 0; padding-top: 20px; padding-bottom: 10px;">
 				Process Control
-			</h2>
-			<form method="post" action="/control">
-				<input type="submit"  value="Pump" name="Pump" />
-				<input type="submit"  value="Shutter" name="Shutter" />
-			</form>
+			</h1>
+			<div style="font-size: 25px;">
+				<form method="post" action="/control">
+					<section style="margin-bottom: 10px;">
+						<left style="float: left; width: 30%;">
+							<label for="RA_mls">Input A:</label>
+							<input type="text" class="Text_box Text_boxH" id="RA_mls" name="RA_mls" value="0"> mls<br><br>
+							<label for="RB_mls">Input B:</label>
+							<input type="text" class="Text_box Text_boxH" id="RB_mls" name="RB_mls" value="0"> mls<br><br>
+						</left>
+						<right style="float: right;width: 30%;">
+							<label for="RC_mls">Input C:</label>
+							<input type="text" class="Text_box Text_boxH" id="RC_mls" name="RC_mls" value="0"> mls<br><br>
+							<label for="RD_mls">Input D:</label>
+							<input type="text" class="Text_box Text_boxH" id="RD_mls" name="RD_mls" value="0"> mls<br><br>
+						</right>
+					</section>
+
+					<label for="Dosage">Total Dosage:</label>
+					<input type="text" class="Text_box Text_boxH" id="Dosage" name="Dosage" value="0"> Gy<br><br>
+					<label for="Output">Select an Output:</label>
+					<select name="Output" id="Output" class="Text_box Text_boxH" style="height: 30px; width: auto;">
+						<option value="OUTPUT_1">OUTPUT 1</option>
+						<option value="OUTPUT_2">OUTPUT 2</option>
+						<option value="OUTPUT_3">OUTPUT 3</option>
+						<option value="OUTPUT_4">OUTPUT 4</option>
+						<option value="OUTPUT_5">MAIN WASTE</option>
+						<option value="OUTPUT_6">RECYCLE</option>
+						<option value="OUTPUT_7">INPUT C</option>
+						<option value="OUTPUT_8">SPARE</option>
+						<option value="OUTPUT_9">SPACE</option>
+						<option value="OUTPUT_10">MINOR WASTE</option>
+					</select>
+					<br><br>
+					<input type="submit" value="Start" name="Start" class="button_Action buttonA" />
+					<input type="submit" value="Wash" name="Wash" class="button_Action buttonA" />
+				</form>
+			</div>
 		</Control_section>
 	</section>
 
@@ -47,10 +80,10 @@
 </body>
 
 <link rel="stylesheet" href="../static/style.css/">
-<meta http-equiv="refresh" content="100000000">
 
 <footer class="footer">
-	<p style="float: left; font-size: small; padding-left: 30px; text-align: center;">Copyright © 2023 Arcadius.     All Rights Reserved.</p>
+	<p style="float: left; font-size: small; padding-left: 30px; text-align: center;">Copyright © 2023 Arcadius. All
+		Rights Reserved.</p>
 	<a class="email" href="mailto:arcadius.uom@gmail.com">Arcadius.UOM@gmail.com</a>
 </footer>
 

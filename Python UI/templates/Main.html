@@ -42,7 +42,7 @@
 			</h1>
 			<img id="stream" src="{{ url_for('video_feed') }}" alt="view" style="width: auto; height:70%;">
 			<form method="post" action="/">
-				<input type="submit" value="Screenshot" name="Screenshot" />
+				<input type="submit" value="Capture" name="Capture" class="button_Capture buttonCap" />
 			</form>
 		</Image_stream>
 
@@ -57,51 +57,55 @@
 					</section>
 				</div>
 			</section>
-			
+
 		</Monitor>
-		<div style="height: 10px;"></div>
-		<section>
-				<div style="width: 10%; float: right;"></div>
-				<div style="width: 90%; float: left; height: 300px; padding-top: 40px;">
-					<section>
-						<div style="width: 10%; float: left;"></div>
-						<table>
-							<tr>
-								<th>Current Command</th>
-								<th>Next Command</th>
-							</tr>
-							<tr>
-								<td>
-									<div id="current">{{Current}}</div>
-								</td>
-								<td>
-									<div id="Next1">{{N1}}</div>
-								</td>
-							</tr>
-							<tr>
-								<td> </td>
-								<td>
-									<div id="Next2">{{N2}}</div>
-								</td>
-							</tr>
-							<tr>
-								<td> </td>
-								<td>
-									<div id="Next3">{{N3}}</div>
-								</td>
-							</tr>
-							<tr>
-								<td> </td>
-								<td>
-									<div id="Next4">{{N4}}</div>
-								</td>
-							</tr>
-						</table>
-					</section>
-				</div>
-			</section>
-		<dialog>Error in loading from command</dialog>
 	</section>
+
+	<section>
+		<div style="width: 10%; float: right;"></div>
+		<div style="width: 90%; float: left; padding-bottom:60px">
+			<section>
+				<div style="width: 10%; float: left;"></div>
+				<h1 style="margin-top:20px; margin-bottom:10px; padding-left: 10%;">
+					System Commands
+				</h1>
+				<table>
+					<tr>
+						<th>Current Command</th>
+						<th>Next Command</th>
+					</tr>
+					<tr>
+						<td>
+							<div id="current">{{Current}}</div>
+						</td>
+						<td>
+							<div id="Next1">{{N1}}</div>
+						</td>
+					</tr>
+					<tr>
+						<td> </td>
+						<td>
+							<div id="Next2">{{N2}}</div>
+						</td>
+					</tr>
+					<tr>
+						<td> </td>
+						<td>
+							<div id="Next3">{{N3}}</div>
+						</td>
+					</tr>
+					<tr>
+						<td> </td>
+						<td>
+							<div id="Next4">{{N4}}</div>
+						</td>
+					</tr>
+				</table>
+			</section>
+		</div>
+	</section>
+	<dialog>Error in loading from command</dialog>
+
 
 	<script>
 
@@ -212,7 +216,6 @@
 </body>
 
 <link rel="stylesheet" href="../static/style.css/">
-<meta http-equiv="refresh" content="100000000">
 
 <footer class="footer">
 	<p style="float: left; font-size: small; padding-left: 30px; text-align: center;">Copyright © 2023 Arcadius. All
