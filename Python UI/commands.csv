@@ -1,39 +1,13 @@
-15:57:56,Pump 1: volume 10.0 
-15:58:31,Pump 1: volume 10.0 
-15:59:05,Pump 1: volume 6.8 
-15:59:29,Shutter state 0 
-15:59:30,Mixer state 8
-15:59:49,Mixer state 0
-15:59:49,Shutter state 1 
-15:59:50,Valve 1: state 0 
-15:59:53,Valve 2: state 2 
-15:59:54,Valve 3: state 2 
-15:59:55,Valve 4: state 2 
-15:59:56,Valve 5: state 2 
-15:59:56,Extract state 90.0 
-15:59:57,Pump 1: volume -63.6 
-16:01:14,Pump 1: volume 83.6 
-16:02:46,Shutter state 1 
-16:02:47,Mixer state 7
-16:02:48,Pump 1: volume 20.0 
-16:04:03,Mixer state 0
-16:04:04,Valve 1: state 0 
-16:04:08,Valve 2: state 2 
-16:04:09,Valve 3: state 2 
-16:04:10,Valve 4: state 2 
-16:04:12,Valve 5: state 2 
-16:04:13,Pump 1: volume -40.0 
-16:05:09,Extract state 180.0 
-16:05:09,Pump 1: volume 40.0 
-16:06:04,Shutter state 1 
-16:06:05,Mixer state 7
-16:06:06,Pump 1: volume 20.0 
-16:07:20,Mixer state 0
-16:07:22,Valve 1: state 0 
-16:07:23,Valve 2: state 2 
-16:07:24,Valve 3: state 2 
-16:07:25,Valve 4: state 2 
-16:07:26,Valve 5: state 2 
-16:07:29,Pump 1: volume -40.0 
-16:08:23,Extract state 180.0 
-16:08:23,Pump 1: volume 40.0 
+16:56:40,Pump 1: volume 15.0 
+16:57:31,Pump 1: volume 15.0 
+16:58:23,Pump 1: volume 15.0 
+16:59:14,Shutter state 0 
+16:59:15,Mixer state 8
+17:00:01,Mixer state 0
+17:00:02,Shutter state 1 
+17:00:03,Valve 1: state 1 
+17:00:07,Valve 2: state 0 
+17:00:07,Valve 3: state 2 
+17:00:08,Valve 4: state 2 
+17:00:09,Valve 5: state 2 
+17:00:10,Pump 1: volume -100.0 

@@ -484,6 +484,7 @@ def WASH(Comps, n=1, volume = 30):
             Comps.pumps[4].pump(-(volume*2))
             Comps.extract.set_slot(5)
             Comps.pumps[5].pump((volume*2))
+            Comps.buffer.BLOCK(15)
         except:
             print('WASHING ERROR')
             pass

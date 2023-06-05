@@ -1178,75 +1178,66 @@ def GUI_Server_Comms():
             try:
                 Out, A, B, C, D, Dose = command.split(',')
                 Out = int(str(Out).replace("OUTPUT_",""))-1
-                print(A)
-                print(B)
-                print(C)
-                print(D)
-                print(Dose)
-                print(Out)
-
                 ent_P = []
                 ent_P.append(float(A))
                 ent_P.append(float(B))
                 ent_P.append(float(C))
                 ent_P.append(float(D))
-                print(ent_P[0])
-                print(ent_P[1])
-                print(ent_P[2])
-                print(ent_P[3])
-                tot_vol=0.0
-                for i in range(len(ent_P)):
-                    try:
-                        vol=ent_P[i]
-                        if vol!=0.0:
-                            try:
-                                Comps.pumps[i].poll()
-                            except:
-                                print('this module does not exist')
-                                break
+                def Experiment(ent_P,Out, Dose):
+                    tot_vol=0.0
+                    for i in range(len(ent_P)):
+                        try:
+                            vol=ent_P[i]
+                            if vol!=0.0:
+                                try:
+                                    Comps.pumps[i].poll()
+                                except:
+                                    print('this module does not exist')
+                                    return -1
+                                    
+                                if Comps.pumps[i].LDS.state == False:
+                                    # To do : Try 10 times before showing error box 
+                                    print("Please fill The vessel of Input module {}".format(i+1))
+                                    return -1
                                 
-                            if Comps.pumps[i].LDS.state == False:
-                                # To do : Try 10 times before showing error box 
-                                print("Please fill The vessel of Input module {}".format(i+1))
-                                break
-                            
-                    except:
-                        pass
-                for i in range(len(ent_P)):
+                        except:
+                            pass
+                    for i in range(len(ent_P)):
+                        try:
+                            vol=ent_P[i]
+                            tot_vol+=vol  
+                            Comps.pumps[i].pump(vol)
+                        except:
+                            pass
                     try:
-                        vol=ent_P[i]
-                        tot_vol+=vol  
-                        Comps.pumps[i].pump(vol)
-                    except:
-                        pass
-                try:
-                    Comps.shutter.open()
-                    Comps.mixer.mix()
-                except:pass
-                try:
-                    time = Comps.radiate.D2T(float(Dose))
-                    Comps.buffer.BLOCK(time)
-                except:pass
-                try:
-                    Comps.mixer.stop()
-                    Comps.shutter.close() 
-                except:pass
+                        Comps.shutter.open()
+                        Comps.mixer.mix()
+                    except:pass
+                    try:
+                        time = Comps.radiate.D2T(float(Dose))
+                        Comps.BLOCK(time)
+                    except:pass
+                    try:
+                        Comps.mixer.stop()
+                        Comps.shutter.close() 
+                    except:pass
 
-                try:
-                    output_index = Out
-                    if 0<=output_index<=4:
-                        com.valve_states(Comps.valves, 0)
-                        Comps.extract.set_slot(output_index+1)
-                        Comps.pumps[4].pump(-(tot_vol*2+10))
-                        Comps.pumps[5].pump((tot_vol*2+30))
-                    else:
-                        com.valve_states(Comps.valves, Out-4)
-                        Comps.pumps[4].pump(-(tot_vol*2+10))
-                except:
-                    print('error ouptut')
-                    pass
-                buffer.NOTIFY('Experiment Over')
-                print("done")
+                    try:
+                        output_index = Out
+                        if 0<=output_index<=4:
+                            com.valve_states(Comps.valves, 0)
+                            Comps.extract.set_slot(output_index+1)
+                            Comps.pumps[4].pump(-(tot_vol*2+10))
+                            Comps.pumps[5].pump((tot_vol*2+30))
+                        else:
+                            com.valve_states(Comps.valves, Out-4)
+                            Comps.pumps[4].pump(-(tot_vol*2+10))
+                    except:
+                        print('error ouptut')
+                        pass
+                    buffer.NOTIFY('Experiment Over')
+                    return 0
+                result = Experiment(ent_P, Out, Dose)
             except:
                 pass
     elif CMD_rev.poll(timeout=0.001):
