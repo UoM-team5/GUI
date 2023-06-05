@@ -620,12 +620,11 @@ def valve_states(Valves, out: int):
             print("error unknown valve state")
             return
     for idx in range(0, len(states)):
-        for i in range(2):
-            match int(states[idx]):
-                case 0: Valves[idx].close()
-                case 1: Valves[idx].open()
-                case 2: Valves[idx].mid()
-                case _: pass
+        match int(states[idx]):
+            case 0: Valves[idx].close()
+            case 1: Valves[idx].open()
+            case 2: Valves[idx].mid()
+            case _: pass
 
 class Shutter:
     def __init__(self, device, ID, component_number: int, buffer):

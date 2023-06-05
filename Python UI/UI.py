@@ -369,7 +369,7 @@ class P_Login(ctk.CTk):
                 top.destroy()
                 gui = Main()
                 gui.after(200,task)
-                # gui.after(500,GUI_Server_Comms)
+                gui.after(200,GUI_Server_Comms)
                 gui.after(1000, sensor_update)
                 gui.mainloop()
             else:
@@ -1169,6 +1169,7 @@ def GUI_Server_Comms():
             gui.Quit_application() # Quits all applications
     if rem_control.get() and CMD_rev.poll(timeout=0.001): # polls the kill pipeline for new commands
         command = CMD_rev.recv()
+        print(command)
         if command == "Wash": # if the command is kill
             print("this is a Wash command")
             com.WASH(Comps,2,20)
@@ -1256,7 +1257,7 @@ def GUI_Server_Comms():
     #     TEMP_send.send(-1)
         #this should be a new comment for git 
     #Temp_Que.put(Comps.Temp.get_last())
-    gui.after(500,GUI_Server_Comms) # executes it every 200ms 
+    gui.after(200,GUI_Server_Comms) # executes it every 200ms 
 
 app = Flask(__name__) #main web application
 
