@@ -182,6 +182,23 @@ tr:nth-child(even) {
 	color: white;
 }
 
+.Text_box{
+	height: 20px;
+	width: 60px;
+	border: 1px solid #0008ff;
+	color: #0008ff;
+	text-align: center;
+	text-decoration: none;
+	display: inline-block;
+	transition-duration: 0.4s;
+	cursor: pointer;
+}
+
+.Text_boxH:hover{
+	background-color: #0008ff;
+	color: white;
+}
+
 .button_Action {
 	background-color: #65656530;
 	border: 1px solid #0008ff;
