@@ -307,7 +307,6 @@ class Frame(ctk.CTkFrame):
         self.label = ctk.CTkLabel(self, text=text)
         self.label.grid(row=0, column=0, padx=20)
 
-
 class P_Login(ctk.CTk):
     def __init__(self, *args, **kwargs):
         ctk.CTk.__init__(self, *args, **kwargs)
@@ -370,7 +369,7 @@ class P_Login(ctk.CTk):
                 gui = Main()
                 gui.after(200,task)
                 gui.after(200,GUI_Server_Comms)
-                gui.after(1000, sensor_update)
+                gui.after(3000, sensor_update)
                 gui.mainloop()
             else:
                 tk.messagebox.showerror("Information", "The Username or Password you have entered are incorrect ")
@@ -434,8 +433,8 @@ class MenuBar(tk.Menu):
 
         menu_help = tk.Menu(self, tearoff=0)
         self.add_cascade(label="More", menu=menu_help)
+        menu_help.add_command(label="Testing",font=('Arial',11), command=lambda: parent.show_frame(P_Test))
         menu_help.add_command(label="Parameter",font=('Arial',11), command=lambda: parent.show_frame(P_Param))
-        menu_help.add_command(label="Unit Test",font=('Arial',11), command=lambda: parent.show_frame(P_Test))
 
 class Main(ctk.CTk):
     def __init__(self, *args, **kwargs):
@@ -612,7 +611,7 @@ class P_Param(ctk.CTkFrame):
 class P_Test(ctk.CTkFrame):
     def __init__(self, parent, controller):
         ctk.CTkFrame.__init__(self,parent)
-        title = ctk.CTkLabel(self, text = "Manual", font=font_L)
+        title = ctk.CTkLabel(self, text = "Testing", font=font_L)
         title.place(relx = 0.5, rely = 0.05, anchor = 'center')
         
         frame1 = Frame(self, text = "Valve")
@@ -651,9 +650,9 @@ class P_Test(ctk.CTkFrame):
         btn1.place(relx = 0.5, rely = 0.4, anchor = 'center')
 
         #box 3 mixer
-        btn0 = btn(frame3, text="slow", command=lambda: Comps.mixer.mix_slow())
+        btn0 = btn(frame3, text="slow", command=lambda: Comps.mixer.slow())
         btn1 = btn(frame3, text="normal", command=lambda: Comps.mixer.mix())
-        btn3 = btn(frame3, text="fast", command=lambda: Comps.mixer.mix_fast())
+        btn3 = btn(frame3, text="fast", command=lambda: Comps.mixer.fast())
         btn2 = btn(frame3, text="stop", command=lambda: Comps.mixer.stop())
         place_n([btn0, btn1, btn3, btn2], rely = 0.2)
 
@@ -804,7 +803,7 @@ class Scratch():
         Ext_widgets = [0]*4
         system_widgets = [0]*4
 
-        In_widgets[0], In_widgets[1] = entry_block(frame, "select pump: ", spin=True, from_=1, to=3)
+        In_widgets[0], In_widgets[1] = entry_block(frame, "select pump: ", spin=True, from_=1, to=4)
         In_widgets[2], In_widgets[3] = entry_block(frame, "Volume (ml)")
         
         self.out_list = ["Out 1", "Out 2", "Out 3", "Out 4", "Out 5", "Out 6"]
@@ -812,7 +811,8 @@ class Scratch():
         Out_widgets[2], Out_widgets[3] = entry_block(frame, "Volume (ml)")
         
         # make drop down slow, mid , fast, and Delay (s)
-        mix_widgets[0], mix_widgets[1] = entry_block(frame, text="Speed")
+        mix_list = ["Stop", "Slow", "Normal", "Fast"]
+        mix_widgets[0], mix_widgets[1] = entry_block(frame, text="Speed", drop_list=mix_list)
         
         # add delay (s)
         shutter_list = ["Open", "close", "mid"]
@@ -862,8 +862,20 @@ class Scratch():
             vol = float(self.Out_widgets[3].get())
             com.valve_states(Comps.valves, state)
             Comps.pumps[4].pump(-vol)
-        elif selected=="Mix":     
-            Comps.mixer.mix()
+        elif selected=="Mix":  
+            state = self.mix_widgets[1].get()
+            match state:
+                case 'Stop':
+                    Comps.mixer.stop()
+                case 'Slow':
+                    Comps.mixer.slow()
+                case 'Normal':
+                    Comps.mixer.mix()
+                case 'Fast':
+                    Comps.mixer.fast()
+                case _:
+                    print('unknown state')
+                    pass
         elif selected=="Shutter": 
             state = self.out_list.index(self.shutter_widgets[1].get())
             Comps.shutter.set_to(state)
@@ -1145,7 +1157,7 @@ def sensor_update():
         TEMP_send.send(Comps.Temp.get_last())
     except:
         TEMP_send.send(-1)
-    gui.after(1000, sensor_update)
+    gui.after(3000, sensor_update)
     time.sleep(0.01)
 
 

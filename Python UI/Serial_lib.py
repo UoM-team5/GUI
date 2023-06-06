@@ -471,12 +471,12 @@ def read_detail(filename:str):
     except:
         return ['']*3,['']*3
     
-def WASH(Comps, n=1, volume = 30):
+def WASH(Comps, n=1, volume = 20):
     for i in range(n):
         #close the shutter, put water solution in the reactor, mix, extract to waste
         try:
             Comps.shutter.close()
-            Comps.mixer.mix_slow() 
+            Comps.mixer.slow() 
             Comps.pumps[3].pump(volume)
             Comps.buffer.BLOCK(5)
             Comps.mixer.stop()
@@ -517,7 +517,7 @@ class Cabin():
         return time
 
 class notif():
-    def __init__(self, app_token = 'adehgb6cn6939abbvchyaj7pt7yst', user_key = 'usoz8aw4jmejvo8mr29i49cwm26gyd'):
+    def __init__(self, app_token = 'aobomapmrh4rmprq1mpy3wza5efsfs', user_key = 'umrzw8s6div1ucpe2getdb9ucaz1f9'):
         self.app_token=app_token
         self.user_key=user_key
         try:
@@ -661,13 +661,13 @@ class Mixer:
         self.num = component_number
         self.buffer = buffer
 
-    def mix_slow(self):
+    def slow(self):
         return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 70)])
     
     def mix(self):
         return self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 85)])
     
-    def mix_fast(self):
+    def fast(self):
         self.buffer.IN([self.device, "[sID1000 rID{} PK3 M{} S{} D1]".format(self.ID, self.num, 100)])
 
     def stop(self):
@@ -698,9 +698,31 @@ class Vessel:
         self.vol = volume
         self.name = liquid_name
         
+    
+
+    def save_detail(names: list, volumes: list, file_name = "details.csv"):
+        try:os.remove(os.path.join(os.path.dirname(os.path.realpath(__file__)), file_name))
+        except:pass
+
+        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), file_name), mode ="a", newline='') as csvfile:
+            for i in range(len(names)):
+                writer = csv.writer(csvfile) 
+                writer.writerow([names[i], volumes[i]])
+
+    def vessel_detail(ent_Rn, ent_Rv):
+        names=[]
+        volumes=[]
+        for i in range(len(ent_Rn)):
+            try:
+                names.append(ent_Rn[i].get())
+                volumes.append(ent_Rv[i].get())
+            except:pass
+        save_detail(names, volumes)
+        return
+    
     def sub(self, volume: float):
         self.vol = self.vol - volume
-
+    
     def add(self, volume: float):
         self.vol = self.vol + volume
     
