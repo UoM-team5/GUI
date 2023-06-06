@@ -697,19 +697,20 @@ class Vessel:
     def __init__(self, volume = 10.0, liquid_name = 'none'):
         self.vol = volume
         self.name = liquid_name
-        
-    
+        self.path = os.path.dirname(os.path.realpath(__file__))
 
-    def save_detail(names: list, volumes: list, file_name = "details.csv"):
-        try:os.remove(os.path.join(os.path.dirname(os.path.realpath(__file__)), file_name))
-        except:pass
+    def save_detail(self, names: list, volumes: list, file_name = "details.csv"):
+        try:
+            os.remove(os.path.join(self.path, 'static\\', file_name))
+        except:
+            pass
 
-        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), file_name), mode ="a", newline='') as csvfile:
+        with open(os.path.join(self.path, 'static\\', file_name), mode ="a", newline='') as csvfile:
             for i in range(len(names)):
                 writer = csv.writer(csvfile) 
                 writer.writerow([names[i], volumes[i]])
-
-    def vessel_detail(ent_Rn, ent_Rv):
+    
+    def vessel_detail(self, ent_Rn, ent_Rv):
         names=[]
         volumes=[]
         for i in range(len(ent_Rn)):
@@ -717,26 +718,17 @@ class Vessel:
                 names.append(ent_Rn[i].get())
                 volumes.append(ent_Rv[i].get())
             except:pass
-        save_detail(names, volumes)
+        self.save_detail(names, volumes)
         return
     
+    def new_label(self, label):
+        self.labels.append(label)
+
     def sub(self, volume: float):
         self.vol = self.vol - volume
     
     def add(self, volume: float):
         self.vol = self.vol + volume
-    
-    def set_volume(self, volume: float):
-        self.vol = volume
-
-    def get_volume(self):
-        return self.vol
-    
-    def set_name(self, name: str):
-        self.name = name
-
-    def get_name(self):
-        return self.name
 
 class LDS:
     def __init__(self, device, ID, Comms):
@@ -785,7 +777,6 @@ class Temp:
             pass
         time.sleep(0.01)
 
-   
     def new_temp(self, Temp = 0.0):
         f = open(self.path, 'a')
         now = datetime.datetime.now()

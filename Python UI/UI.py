@@ -854,7 +854,7 @@ class Scratch():
         selected = self.combo.get()
         print(selected)
         if selected=="Input":     
-            num = int(self.In_widgets[1].get())
+            num = int(self.In_widgets[1].get())-1
             vol = float(self.In_widgets[3].get())
             Comps.pumps[num].pump(vol)
         elif selected=="Output":  
