@@ -1125,6 +1125,11 @@ def sensor_update():
             pass  
     except:
         pass
+    try:
+        TEMP_send.send(Comps.Temp.get_last())
+    except:
+        TEMP_send.send(-1)
+
     gui.after(2000, sensor_update)
     time.sleep(0.01)
 
@@ -1229,10 +1234,6 @@ def GUI_Server_Comms():
                 pass
     elif CMD_rev.poll(timeout=0.001):
         CMD_rev.recv()
-    try:
-        TEMP_send.send(Comps.Temp.get_last())
-    except:
-        TEMP_send.send(-1)
         #this should be a new comment for git 
     #Temp_Que.put(Comps.Temp.get_last())
     gui.after(200,GUI_Server_Comms) # executes it every 200ms 
