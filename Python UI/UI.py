@@ -192,6 +192,7 @@ radiate = com.Cabin()
 
 def init_module(label=None):
     global arduinos, device, gui
+    buffer.RESET()
     try: Comms.CLOSE_SERIAL_PORT(arduinos)
     except: pass
     Ports = Comms.ID_PORTS_AVAILABLE()
@@ -429,11 +430,10 @@ class MenuBar(tk.Menu):
         self.add_command(label="Home", command=lambda: parent.show_frame(P_Home))
         self.add_command(label="Auto", command=lambda: parent.show_frame(P_Auto))
         self.add_command(label="Manual", command=lambda: parent.show_frame(P_Code))
-        self.add_command(label="Iterative", command=lambda: parent.show_frame(P_Iter))
-
+        self.add_command(label="Testing", command=lambda: parent.show_frame(P_Test))
         menu_help = tk.Menu(self, tearoff=0)
         self.add_cascade(label="More", menu=menu_help)
-        menu_help.add_command(label="Testing",font=('Arial',11), command=lambda: parent.show_frame(P_Test))
+        menu_help.add_command(label="Reset All",font=('Arial',11), command=lambda: init_module())
         menu_help.add_command(label="Parameter",font=('Arial',11), command=lambda: parent.show_frame(P_Param))
 
 class Main(ctk.CTk):
@@ -526,7 +526,7 @@ class P_Home(ctk.CTkFrame):
         add_image(self, "arcadius.png", relx=0.5, rely=0.05, size=(300,60), anchor = 'n')
 
         btn1=btn_img(self, "Automatic", "auto.png", command=lambda: controller.show_frame(P_Auto))
-        btn2=btn_img(self, "Iterate", "iter.png", command=lambda: controller.show_frame(P_Iter))
+        btn2=btn_img(self, "Testing", "iter.png", command=lambda: controller.show_frame(P_Test))
         btn3=btn_img(self, "Manual", "code.png", command=lambda: controller.show_frame(P_Code))
         place_n([btn1, btn3, btn2], 0.4)
 
@@ -666,16 +666,16 @@ class P_Auto(ctk.CTkFrame):
         title = ctk.CTkLabel(self, text = "Automatic", font=font_L)
         title.place(relx = 0.5, rely = 0.1, anchor = 'center')
 
-        frame1 = Frame(self)
+        frame1 = Frame(self, text = 'Gold Nano Particle Experiment')
         frame1.place(relx= 0.5, rely = 0.55, relwidth=0.45, relheight=0.8, anchor = 'e')
         frame2 = Frame(self, fg_color = 'transparent')
         frame2.place(relx= 0.5, rely = 0.55, relwidth=0.45, relheight=0.8, anchor = 'w')
 
         ent_P = [0]*4
-        _, ent_P[0] = place_2(0.2, *entry_block(frame1, text="Input 1 (ml)"))
-        _, ent_P[1] = place_2(0.3, *entry_block(frame1, text="Input 2 (ml)"))
+        _, ent_P[0] = place_2(0.2, *entry_block(frame1, text="Gold    (ml)"))
+        _, ent_P[1] = place_2(0.3, *entry_block(frame1, text="Alcohol (ml)"))
         _, ent_P[2] = place_2(0.4, *entry_block(frame1, text="Input 3 (ml)"))
-        _, ent_P[3] = place_2(0.5, *entry_block(frame1, text="Input 4 (ml)"))
+        _, ent_P[3] = place_2(0.5, *entry_block(frame1, text="Water   (ml)"))
         _, ent_I = place_2(0.6, *entry_block(frame1, text="Total dosage (Gy)"))
 
         
@@ -815,7 +815,7 @@ class Scratch():
         mix_widgets[0], mix_widgets[1] = entry_block(frame, text="Speed", drop_list=mix_list)
         
         # add delay (s)
-        shutter_list = ["Open", "close", "mid"]
+        shutter_list = ["Open", "Close", "Mid"]
         shutter_widgets[0], shutter_widgets[1] = entry_block(frame, text="mode", drop_list=shutter_list)
         
         Ext_widgets[0], Ext_widgets[1] = entry_block(frame, "select slot: ", spin=True, from_=1, to=5)
@@ -877,8 +877,17 @@ class Scratch():
                     print('unknown state')
                     pass
         elif selected=="Shutter": 
-            state = self.out_list.index(self.shutter_widgets[1].get())
-            Comps.shutter.set_to(state)
+            state = self.shutter_widgets[1].get()
+            match state:
+                case 'Open':
+                    Comps.shutter.open()
+                case 'Close':
+                    Comps.shutter.close()
+                case 'Mid':
+                    Comps.shutter.mid()
+                case _:
+                    print('unknown state')
+                    pass
         elif selected=="Extract": 
             state = int(self.Ext_widgets[1].get())
             vol = float(self.Ext_widgets[3].get())
@@ -1146,7 +1155,7 @@ def task():
 def sensor_update():
     #update temperature sensor
     try:
-        if Comps.arduinos[0].state == False:# and Comps.buffer.blocked:
+        if Comps.arduinos[0].state == False and Comps.buffer.blocked:
             Comps.arduinos[0].busy()
             Comps.Temp.poll() 
             buffer.current_device = Comps.Temp.device

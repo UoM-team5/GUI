@@ -575,7 +575,6 @@ class Pump:
         else: 
             return 1
 
-
     def set_state(self, state: bool):
         """Param bool state: set False->idle, True->used"""
         self.state = state
