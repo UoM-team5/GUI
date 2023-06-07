@@ -181,7 +181,70 @@ def check_isnumber(value, type = 'float'):
                 popup('Please, insert an integer')
     else:
         pass
-    
+
+def Auto_Experiment(In, Out, Dose, Desktop = False):
+
+    # type: (list [float], int, float, bool) -> int
+    """
+    -1 if Error,
+    0 if Pass
+    """
+
+    tot_vol=0.0
+    # check LDS sensors of relevant modules
+    for i in range(len(In)):
+        try:
+            vol=In[i]
+            if vol!=0.0:
+                try:
+                    Comps.pumps[i].poll()
+                except:
+                    print('this module does not exist')
+                    return -1
+                    
+                if Comps.pumps[i].LDS.state == False:
+                    # To do : Try 10 times before showing error box 
+                    print("Please fill The vessel of Input module {}".format(i+1))
+                    return -1
+                
+        except:
+            pass
+    for i in range(len(In)):
+        try:
+            vol=In[i]
+            tot_vol+=vol  
+            Comps.pumps[i].pump(vol)
+        except:
+            pass
+    try:
+        Comps.shutter.open()
+        Comps.mixer.mix()
+    except:pass
+    try:
+        time = Comps.radiate.D2T(float(Dose))
+        Comps.BLOCK(time)
+    except:pass
+    try:
+        Comps.mixer.stop()
+        Comps.shutter.close() 
+    except:pass
+
+    try:
+        output_index = Out
+        if 0<=output_index<=4:
+            com.valve_states(Comps.valves, 0)
+            Comps.extract.set_slot(output_index+1)
+            Comps.pumps[4].pump(-(tot_vol*2+10))
+            Comps.pumps[5].pump((tot_vol*2+30))
+        else:
+            com.valve_states(Comps.valves, Out-4)
+            Comps.pumps[4].pump(-(tot_vol*2+10))
+    except:
+        print('error ouptut')
+        pass
+    buffer.NOTIFY('Experiment Over')
+    return 0  
+
 #init comms
 com.delete_file()
 Comps = com.Components()
