@@ -38,7 +38,7 @@ Intuitive GUI to alow chemists to easily perform and monitor experiments
 ![UI_init](https://github.com/UoM-team5/GUI/assets/78451671/4f247eb6-b2cb-4a91-adc5-0b29e9b25f01)
 
 #### Home Page
-![UI_Home](https://github.com/UoM-team5/GUI/assets/78451671/d2e0b021-d6cf-439a-95de-6584c3181fda)
+![UI_Home](https://github.com/UoM-team5/GUI/assets/78451671/f22b7878-fb29-4621-961e-014692b73217)
 
 #### Automated Page
 ![UI_Auto](https://github.com/UoM-team5/GUI/assets/78451671/54ab712f-ae84-4dfb-82a5-e7c0a37b2ded)
