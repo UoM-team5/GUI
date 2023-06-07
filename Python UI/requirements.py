@@ -5,6 +5,6 @@ try:
 except:
     print("WARNING: Update python compiler to >3.10\n")
 
-packages = ['pip', 'pyserial', 'Pillow', 'customtkinter', 'opencv-python']
+packages = ['pip', 'pyserial', 'Pillow', 'customtkinter', 'opencv-python', 'requests', 'flask', 'chump']
 for package in packages:
     os.system('py -m pip install --upgrade ' + package)
